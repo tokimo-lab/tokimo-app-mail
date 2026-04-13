@@ -1,12 +1,23 @@
-import { Button, cn, Input, ScrollArea, Spin } from "@tokiomo/components";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  Button,
+  Checkbox,
+  cn,
+  Form,
+  type FormInstance,
+  Input,
+  Password,
+  ScrollArea,
+  Select,
+  Spin,
+  useForm,
+} from "@tokiomo/components";
 import {
   ArrowLeft,
   ArrowRight,
   Check,
   CheckCircle2,
   ChevronRight,
-  Eye,
-  EyeOff,
   Globe,
   Mail,
   Shield,
@@ -17,9 +28,30 @@ import { api } from "@/generated/rust-api";
 import type { MailProviderPresetOutput } from "@/generated/rust-api/mail";
 import { useMessage } from "@/system/notifications/useMessage";
 
+const SECURITY_OPTIONS = [
+  { value: "tls", label: "SSL/TLS" },
+  { value: "starttls", label: "STARTTLS" },
+  { value: "none", label: "None" },
+];
+
 interface AccountSetupProps {
   onComplete: () => void;
   onCancel?: () => void;
+}
+
+interface CredentialValues {
+  email: string;
+  displayName: string;
+  password: string;
+  imapHost: string;
+  imapPort: string;
+  imapSecurity: string;
+  smtpHost: string;
+  smtpPort: string;
+  smtpSecurity: string;
+  smtpUsername: string;
+  smtpPassword: string;
+  useSeparateSmtp: boolean;
 }
 
 type Step = "provider" | "credentials" | "test";
@@ -29,30 +61,18 @@ export function AccountSetup({ onComplete, onCancel }: AccountSetupProps) {
   const [selectedPreset, setSelectedPreset] =
     useState<MailProviderPresetOutput | null>(null);
   const [isCustom, setIsCustom] = useState(false);
-
-  // Credential form state
-  const [email, setEmail] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [imapHost, setImapHost] = useState("");
-  const [imapPort, setImapPort] = useState("");
-  const [imapSecurity, setImapSecurity] = useState("tls");
-  const [smtpHost, setSmtpHost] = useState("");
-  const [smtpPort, setSmtpPort] = useState("");
-  const [smtpSecurity, setSmtpSecurity] = useState("tls");
-  const [smtpUsername, setSmtpUsername] = useState("");
-  const [smtpPassword, setSmtpPassword] = useState("");
-  const [useSeparateSmtp, setUseSeparateSmtp] = useState(false);
+  const [form] = useForm();
 
   const handleSelectPreset = (preset: MailProviderPresetOutput) => {
     setSelectedPreset(preset);
-    setImapHost(preset.imapHost);
-    setImapPort(String(preset.imapPort));
-    setImapSecurity(preset.imapSecurity);
-    setSmtpHost(preset.smtpHost);
-    setSmtpPort(String(preset.smtpPort));
-    setSmtpSecurity(preset.smtpSecurity);
+    form.setFieldsValue({
+      imapHost: preset.imapHost,
+      imapPort: String(preset.imapPort),
+      imapSecurity: preset.imapSecurity,
+      smtpHost: preset.smtpHost,
+      smtpPort: String(preset.smtpPort),
+      smtpSecurity: preset.smtpSecurity,
+    });
     setIsCustom(false);
     setStep("credentials");
   };
@@ -68,22 +88,24 @@ export function AccountSetup({ onComplete, onCancel }: AccountSetupProps) {
     if (step === "test") setStep("credentials");
   };
 
+  const values = form.getFieldsValue() as CredentialValues;
+
   return (
-    <div className="flex h-full items-center justify-center bg-background">
-      <div className="flex h-[550px] w-[600px] flex-col rounded-lg border border-border bg-background shadow-lg">
+    <div className="flex h-full items-center justify-center bg-surface-base">
+      <div className="flex h-[550px] w-[600px] flex-col rounded-xl border border-border-base bg-surface-elevated shadow-lg">
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-border px-5 py-4">
+        <div className="flex items-center gap-3 border-b border-black/[0.06] px-5 py-4 dark:border-white/[0.08]">
           {step !== "provider" && (
             <button
               type="button"
-              className="cursor-pointer rounded p-1 text-muted-foreground hover:text-foreground"
+              className="cursor-pointer rounded p-1 text-fg-muted hover:text-fg-primary"
               onClick={handleBack}
             >
               <ArrowLeft className="size-4" />
             </button>
           )}
-          <Mail className="size-5 text-primary" />
-          <h2 className="text-base font-semibold text-foreground">
+          <Mail className="size-5 text-accent" />
+          <h2 className="text-base font-semibold text-fg-primary">
             {step === "provider" && "Add Email Account"}
             {step === "credentials" &&
               (selectedPreset
@@ -94,7 +116,7 @@ export function AccountSetup({ onComplete, onCancel }: AccountSetupProps) {
           {onCancel && (
             <button
               type="button"
-              className="ml-auto cursor-pointer text-sm text-muted-foreground hover:text-foreground"
+              className="ml-auto cursor-pointer text-sm text-fg-muted hover:text-fg-primary"
               onClick={onCancel}
             >
               Cancel
@@ -115,51 +137,26 @@ export function AccountSetup({ onComplete, onCancel }: AccountSetupProps) {
           )}
           {step === "credentials" && (
             <CredentialStep
+              form={form}
               preset={selectedPreset}
               isCustom={isCustom}
-              email={email}
-              setEmail={setEmail}
-              displayName={displayName}
-              setDisplayName={setDisplayName}
-              password={password}
-              setPassword={setPassword}
-              showPassword={showPassword}
-              setShowPassword={setShowPassword}
-              imapHost={imapHost}
-              setImapHost={setImapHost}
-              imapPort={imapPort}
-              setImapPort={setImapPort}
-              imapSecurity={imapSecurity}
-              setImapSecurity={setImapSecurity}
-              smtpHost={smtpHost}
-              setSmtpHost={setSmtpHost}
-              smtpPort={smtpPort}
-              setSmtpPort={setSmtpPort}
-              smtpSecurity={smtpSecurity}
-              setSmtpSecurity={setSmtpSecurity}
-              smtpUsername={smtpUsername}
-              setSmtpUsername={setSmtpUsername}
-              smtpPassword={smtpPassword}
-              setSmtpPassword={setSmtpPassword}
-              useSeparateSmtp={useSeparateSmtp}
-              setUseSeparateSmtp={setUseSeparateSmtp}
               onNext={() => setStep("test")}
             />
           )}
           {step === "test" && (
             <TestStep
-              email={email}
-              displayName={displayName}
-              password={password}
+              email={values.email}
+              displayName={values.displayName}
+              password={values.password}
               provider={selectedPreset?.provider}
-              imapHost={imapHost}
-              imapPort={imapPort}
-              imapSecurity={imapSecurity}
-              smtpHost={smtpHost}
-              smtpPort={smtpPort}
-              smtpSecurity={smtpSecurity}
-              smtpUsername={useSeparateSmtp ? smtpUsername : ""}
-              smtpPassword={useSeparateSmtp ? smtpPassword : ""}
+              imapHost={values.imapHost}
+              imapPort={values.imapPort}
+              imapSecurity={values.imapSecurity}
+              smtpHost={values.smtpHost}
+              smtpPort={values.smtpPort}
+              smtpSecurity={values.smtpSecurity}
+              smtpUsername={values.useSeparateSmtp ? values.smtpUsername : ""}
+              smtpPassword={values.useSeparateSmtp ? values.smtpPassword : ""}
               onComplete={onComplete}
               onBack={handleBack}
             />
@@ -181,18 +178,18 @@ function StepIndicator({ current }: { current: Step }) {
   const currentIdx = steps.findIndex((s) => s.key === current);
 
   return (
-    <div className="flex items-center gap-2 border-b border-border px-5 py-2">
+    <div className="flex items-center gap-2 border-b border-black/[0.06] px-5 py-2 dark:border-white/[0.08]">
       {steps.map((s, i) => (
         <div key={s.key} className="flex items-center gap-2">
-          {i > 0 && <ChevronRight className="size-3 text-muted-foreground" />}
+          {i > 0 && <ChevronRight className="size-3 text-fg-muted" />}
           <span
             className={cn(
               "text-xs font-medium",
               i === currentIdx
-                ? "text-primary"
+                ? "text-accent"
                 : i < currentIdx
-                  ? "text-foreground"
-                  : "text-muted-foreground",
+                  ? "text-fg-primary"
+                  : "text-fg-muted",
             )}
           >
             {s.label}
@@ -213,7 +210,7 @@ function ProviderStep({
   onSelectCustom: () => void;
 }) {
   const { data, isLoading } = api.mail.listProviders.useQuery({});
-  const presets = (data?.data ?? []) as MailProviderPresetOutput[];
+  const presets = (data ?? []) as MailProviderPresetOutput[];
 
   if (isLoading) {
     return (
@@ -224,44 +221,42 @@ function ProviderStep({
   }
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea direction="vertical" className="h-full">
       <div className="grid grid-cols-2 gap-2 p-4">
         {presets.map((preset) => (
           <button
             key={preset.provider}
             type="button"
-            className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/50"
+            className="flex cursor-pointer items-center gap-3 rounded-lg border border-border-base p-3 text-left transition-colors hover:border-accent/50 hover:bg-fill-tertiary"
             onClick={() => onSelectPreset(preset)}
           >
-            <Mail className="size-5 shrink-0 text-primary" />
+            <Mail className="size-5 shrink-0 text-accent" />
             <div className="min-w-0">
-              <div className="text-sm font-medium text-foreground">
+              <div className="text-sm font-medium text-fg-primary">
                 {preset.displayName}
               </div>
-              <div className="truncate text-xs text-muted-foreground">
+              <div className="truncate text-xs text-fg-muted">
                 {preset.domains.join(", ")}
               </div>
             </div>
-            <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground" />
+            <ChevronRight className="ml-auto size-4 shrink-0 text-fg-muted" />
           </button>
         ))}
 
         {/* Custom option */}
         <button
           type="button"
-          className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border p-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/50"
+          className="flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-border-base p-3 text-left transition-colors hover:border-accent/50 hover:bg-fill-tertiary"
           onClick={onSelectCustom}
         >
-          <Globe className="size-5 shrink-0 text-muted-foreground" />
+          <Globe className="size-5 shrink-0 text-fg-muted" />
           <div>
-            <div className="text-sm font-medium text-foreground">
+            <div className="text-sm font-medium text-fg-primary">
               Other / Custom
             </div>
-            <div className="text-xs text-muted-foreground">
-              Manual IMAP/SMTP
-            </div>
+            <div className="text-xs text-fg-muted">Manual IMAP/SMTP</div>
           </div>
-          <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground" />
+          <ChevronRight className="ml-auto size-4 shrink-0 text-fg-muted" />
         </button>
       </div>
     </ScrollArea>
@@ -271,73 +266,37 @@ function ProviderStep({
 // ── Credentials step ─────────────────────────────────────────────────────────
 
 function CredentialStep({
+  form,
   preset,
   isCustom,
-  email,
-  setEmail,
-  displayName,
-  setDisplayName,
-  password,
-  setPassword,
-  showPassword,
-  setShowPassword,
-  imapHost,
-  setImapHost,
-  imapPort,
-  setImapPort,
-  imapSecurity,
-  setImapSecurity,
-  smtpHost,
-  setSmtpHost,
-  smtpPort,
-  setSmtpPort,
-  smtpSecurity,
-  setSmtpSecurity,
-  smtpUsername,
-  setSmtpUsername,
-  smtpPassword,
-  setSmtpPassword,
-  useSeparateSmtp,
-  setUseSeparateSmtp,
   onNext,
 }: {
+  form: FormInstance;
   preset: MailProviderPresetOutput | null;
   isCustom: boolean;
-  email: string;
-  setEmail: (v: string) => void;
-  displayName: string;
-  setDisplayName: (v: string) => void;
-  password: string;
-  setPassword: (v: string) => void;
-  showPassword: boolean;
-  setShowPassword: (v: boolean) => void;
-  imapHost: string;
-  setImapHost: (v: string) => void;
-  imapPort: string;
-  setImapPort: (v: string) => void;
-  imapSecurity: string;
-  setImapSecurity: (v: string) => void;
-  smtpHost: string;
-  setSmtpHost: (v: string) => void;
-  smtpPort: string;
-  setSmtpPort: (v: string) => void;
-  smtpSecurity: string;
-  setSmtpSecurity: (v: string) => void;
-  smtpUsername: string;
-  setSmtpUsername: (v: string) => void;
-  smtpPassword: string;
-  setSmtpPassword: (v: string) => void;
-  useSeparateSmtp: boolean;
-  setUseSeparateSmtp: (v: boolean) => void;
   onNext: () => void;
 }) {
-  const canProceed = email.trim() && password.trim();
+  const useSeparateSmtp = Form.useWatch<boolean>("useSeparateSmtp", form);
+
+  const handleNext = async () => {
+    try {
+      await form.validateFields();
+      onNext();
+    } catch {
+      // validation errors shown inline
+    }
+  };
 
   return (
-    <ScrollArea className="h-full">
-      <div className="space-y-4 p-5">
+    <ScrollArea direction="vertical" className="h-full">
+      <Form
+        form={form}
+        layout="vertical"
+        className="space-y-1 p-5"
+        initialValues={{ imapSecurity: "tls", smtpSecurity: "tls" }}
+      >
         {/* Setup instructions */}
-        {preset && preset.setupInstructions.length > 0 && (
+        {preset && preset.setupInstructions?.length > 0 && (
           <div className="rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/30">
             <div className="mb-2 flex items-center gap-1.5 text-sm font-medium text-blue-700 dark:text-blue-300">
               <Shield className="size-4" />
@@ -361,168 +320,100 @@ function CredentialStep({
           </div>
         )}
 
-        {/* Email & display name */}
-        <div className="space-y-2">
-          <span className="text-sm font-medium text-foreground">
-            Email Address
-          </span>
-          <Input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            type="email"
-          />
-        </div>
+        <Form.Item
+          label="Email Address"
+          name="email"
+          rules={[
+            { required: true, message: "Email is required" },
+            { type: "email", message: "Invalid email address" },
+          ]}
+        >
+          <Input placeholder="you@example.com" />
+        </Form.Item>
 
-        <div className="space-y-2">
-          <span className="text-sm font-medium text-foreground">
-            Display Name
-          </span>
-          <Input
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Your Name"
-          />
-        </div>
+        <Form.Item label="Display Name" name="displayName">
+          <Input placeholder="Your Name" />
+        </Form.Item>
 
-        {/* Password */}
-        <div className="space-y-2">
-          <span className="text-sm font-medium text-foreground">
-            {preset?.requiresAppPassword ? "App Password" : "Password"}
-          </span>
-          <div className="relative">
-            <Input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              type={showPassword ? "text" : "password"}
-              placeholder={
-                preset?.requiresAppPassword
-                  ? "Enter app-specific password"
-                  : "Enter password"
-              }
-            />
-            <button
-              type="button"
-              className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer text-muted-foreground hover:text-foreground"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? (
-                <EyeOff className="size-4" />
-              ) : (
-                <Eye className="size-4" />
-              )}
-            </button>
-          </div>
-        </div>
+        <Form.Item
+          label={preset?.requiresAppPassword ? "App Password" : "Password"}
+          name="password"
+          rules={[{ required: true, message: "Password is required" }]}
+        >
+          <Password
+            placeholder={
+              preset?.requiresAppPassword
+                ? "Enter app-specific password"
+                : "Enter password"
+            }
+          />
+        </Form.Item>
 
         {/* Custom server fields */}
         {isCustom && (
           <>
-            <div className="border-t border-border pt-4">
-              <h4 className="mb-2 text-sm font-medium text-foreground">
+            <div className="border-t border-border-base pt-3">
+              <h4 className="mb-2 text-sm font-medium text-fg-primary">
                 IMAP Settings
               </h4>
               <div className="grid grid-cols-3 gap-2">
                 <div className="col-span-2">
-                  <Input
-                    value={imapHost}
-                    onChange={(e) => setImapHost(e.target.value)}
-                    placeholder="imap.example.com"
-                  />
+                  <Form.Item name="imapHost" className="!mb-0">
+                    <Input placeholder="imap.example.com" />
+                  </Form.Item>
                 </div>
-                <Input
-                  value={imapPort}
-                  onChange={(e) => setImapPort(e.target.value)}
-                  placeholder="993"
-                />
+                <Form.Item name="imapPort" className="!mb-0">
+                  <Input placeholder="993" />
+                </Form.Item>
               </div>
-              <select
-                value={imapSecurity}
-                onChange={(e) => setImapSecurity(e.target.value)}
-                className="mt-2 w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
-              >
-                <option value="tls">SSL/TLS</option>
-                <option value="starttls">STARTTLS</option>
-                <option value="none">None</option>
-              </select>
+              <Form.Item name="imapSecurity" className="mt-2">
+                <Select options={SECURITY_OPTIONS} />
+              </Form.Item>
             </div>
 
-            <div className="border-t border-border pt-4">
-              <h4 className="mb-2 text-sm font-medium text-foreground">
+            <div className="border-t border-border-base pt-3">
+              <h4 className="mb-2 text-sm font-medium text-fg-primary">
                 SMTP Settings
               </h4>
               <div className="grid grid-cols-3 gap-2">
                 <div className="col-span-2">
-                  <Input
-                    value={smtpHost}
-                    onChange={(e) => setSmtpHost(e.target.value)}
-                    placeholder="smtp.example.com"
-                  />
+                  <Form.Item name="smtpHost" className="!mb-0">
+                    <Input placeholder="smtp.example.com" />
+                  </Form.Item>
                 </div>
-                <Input
-                  value={smtpPort}
-                  onChange={(e) => setSmtpPort(e.target.value)}
-                  placeholder="465"
-                />
+                <Form.Item name="smtpPort" className="!mb-0">
+                  <Input placeholder="465" />
+                </Form.Item>
               </div>
-              <select
-                value={smtpSecurity}
-                onChange={(e) => setSmtpSecurity(e.target.value)}
-                className="mt-2 w-full rounded-md border border-border bg-background px-3 py-1.5 text-sm text-foreground"
-              >
-                <option value="tls">SSL/TLS</option>
-                <option value="starttls">STARTTLS</option>
-                <option value="none">None</option>
-              </select>
+              <Form.Item name="smtpSecurity" className="mt-2">
+                <Select options={SECURITY_OPTIONS} />
+              </Form.Item>
             </div>
           </>
         )}
 
-        {/* Separate SMTP credentials */}
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="separate-smtp"
-            checked={useSeparateSmtp}
-            onChange={(e) => setUseSeparateSmtp(e.target.checked)}
-            className="cursor-pointer"
-          />
-          <label
-            htmlFor="separate-smtp"
-            className="cursor-pointer text-sm text-muted-foreground"
-          >
-            Use different credentials for SMTP
-          </label>
-        </div>
+        <Form.Item name="useSeparateSmtp" valuePropName="checked">
+          <Checkbox>Use different credentials for SMTP</Checkbox>
+        </Form.Item>
 
         {useSeparateSmtp && (
-          <div className="space-y-2 pl-4">
-            <Input
-              value={smtpUsername}
-              onChange={(e) => setSmtpUsername(e.target.value)}
-              placeholder="SMTP username"
-            />
-            <Input
-              value={smtpPassword}
-              onChange={(e) => setSmtpPassword(e.target.value)}
-              type="password"
-              placeholder="SMTP password"
-            />
+          <div className="space-y-1 pl-4">
+            <Form.Item label="SMTP Username" name="smtpUsername">
+              <Input placeholder="SMTP username" />
+            </Form.Item>
+            <Form.Item label="SMTP Password" name="smtpPassword">
+              <Password placeholder="SMTP password" />
+            </Form.Item>
           </div>
         )}
 
-        {/* Next button */}
         <div className="flex justify-end pt-2">
-          <Button
-            className="cursor-pointer"
-            onClick={onNext}
-            disabled={!canProceed}
-          >
+          <Button className="cursor-pointer" onClick={handleNext}>
             Test Connection
             <ArrowRight className="ml-2 size-4" />
           </Button>
         </div>
-      </div>
+      </Form>
     </ScrollArea>
   );
 }
@@ -561,12 +452,13 @@ function TestStep({
   onBack: () => void;
 }) {
   const msg = useMessage();
+  const qc = useQueryClient();
 
   const createAccount = api.mail.createAccount.useMutation({
     onSuccess: () => {
       msg.success("Account added successfully!");
       // Invalidate accounts list so sidebar picks it up.
-      api.mail.listAccounts.invalidate(api.mail.listAccounts.queryKey());
+      api.mail.listAccounts.invalidate(qc);
       onComplete();
     },
     onError: (err) => {
@@ -596,8 +488,8 @@ function TestStep({
     <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
       {createAccount.isPending && (
         <>
-          <Spin className="size-8 text-primary" />
-          <p className="text-sm text-muted-foreground">
+          <Spin className="size-8 text-accent" />
+          <p className="text-sm text-fg-muted">
             Creating account and testing connection...
           </p>
         </>
@@ -606,10 +498,10 @@ function TestStep({
       {createAccount.isSuccess && (
         <>
           <CheckCircle2 className="size-10 text-green-500" />
-          <p className="text-sm font-medium text-foreground">
+          <p className="text-sm font-medium text-fg-primary">
             Account connected successfully!
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-fg-muted">
             Your mailbox is being synced in the background.
           </p>
         </>
@@ -617,16 +509,16 @@ function TestStep({
 
       {createAccount.isError && (
         <>
-          <XCircle className="size-10 text-destructive" />
-          <p className="text-sm font-medium text-foreground">
+          <XCircle className="size-10 text-red-500" />
+          <p className="text-sm font-medium text-fg-primary">
             Connection failed
           </p>
-          <p className="max-w-md text-center text-sm text-muted-foreground">
+          <p className="max-w-md text-center text-sm text-fg-muted">
             {createAccount.error?.message || "Unknown error"}
           </p>
           <div className="flex gap-2">
             <Button
-              variant="outline"
+              variant="default"
               className="cursor-pointer"
               onClick={onBack}
             >
@@ -642,13 +534,13 @@ function TestStep({
 
       {createAccount.isIdle && (
         <>
-          <Mail className="size-10 text-primary" />
-          <p className="text-sm text-muted-foreground">
+          <Mail className="size-10 text-accent" />
+          <p className="text-sm text-fg-muted">
             Ready to add <strong>{email}</strong>
           </p>
           <div className="flex gap-2">
             <Button
-              variant="outline"
+              variant="default"
               className="cursor-pointer"
               onClick={onBack}
             >

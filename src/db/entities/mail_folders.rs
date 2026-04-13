@@ -24,6 +24,7 @@ pub struct Model {
     pub uid_next: Option<i32>,
     pub sort_order: i32,
     pub updated_at: DateTimeWithTimeZone,
+    pub history_sync_cursor: Option<i32>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

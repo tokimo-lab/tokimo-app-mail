@@ -5,7 +5,7 @@ export function useMailAccounts() {
   const { data, isLoading, refetch } = api.mail.listAccounts.useQuery({});
 
   return {
-    accounts: (data?.data ?? []) as MailAccountOutput[],
+    accounts: (data ?? []) as MailAccountOutput[],
     isLoading,
     refetch,
   };

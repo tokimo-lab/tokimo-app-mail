@@ -1,12 +1,17 @@
-import { Badge, Button, cn, ScrollArea, Spin, Tooltip } from "@tokiomo/components";
+import {
+  AppSidebar,
+  type AppSidebarSection,
+  Badge,
+  Spin,
+  Tooltip,
+} from "@tokiomo/components";
 import {
   AlertCircle,
   Archive,
-  ChevronDown,
-  ChevronRight,
   Folder,
   Inbox,
-  Mail,
+  PanelLeft,
+  PanelLeftClose,
   Pencil,
   Plus,
   RefreshCw,
@@ -14,7 +19,7 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { api } from "@/generated/rust-api";
 import type {
   MailAccountOutput,
@@ -41,176 +46,230 @@ function getFolderIcon(folderType: string, folderName: string) {
   return Icon;
 }
 
+/** Color palette for account icons (cycles through). */
+const ACCOUNT_COLORS = [
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+  "#f59e0b",
+  "#10b981",
+  "#06b6d4",
+];
+
 interface MailSidebarProps {
   accounts: MailAccountOutput[];
   selectedAccountId: string | null;
   selectedFolderId: string | null;
+  collapsed?: boolean;
   onSelectAccount: (id: string) => void;
   onSelectFolder: (id: string) => void;
   onAddAccount: () => void;
   onCompose: () => void;
+  onToggleCollapse?: () => void;
 }
 
 export function MailSidebar({
   accounts,
   selectedAccountId,
   selectedFolderId,
+  collapsed,
   onSelectAccount,
   onSelectFolder,
   onAddAccount,
   onCompose,
+  onToggleCollapse,
 }: MailSidebarProps) {
-  return (
-    <div className="flex h-full w-56 shrink-0 flex-col border-r border-border-base bg-[var(--sidebar-bg)] select-none">
-      {/* Compose button */}
-      <div className="shrink-0 border-b border-black/[0.06] px-3 pt-4 pb-3 dark:border-white/[0.08]">
-        <Button className="w-full cursor-pointer" onClick={onCompose}>
-          <Pencil className="mr-2 size-4" />
-          Compose
-        </Button>
-      </div>
-
-      <ScrollArea className="flex-1">
-        <div className="px-2 pt-3">
-          {accounts.map((account, i) => (
-            <AccountSection
-              key={account.id}
-              account={account}
-              isSelected={selectedAccountId === account.id}
-              selectedFolderId={selectedFolderId}
-              onSelectAccount={onSelectAccount}
-              onSelectFolder={onSelectFolder}
-              showSeparator={i > 0}
-            />
-          ))}
-        </div>
-      </ScrollArea>
-
-      {/* Add account */}
-      <div className="shrink-0 border-t border-black/[0.06] px-2 py-2 dark:border-white/[0.08]">
-        <button
-          type="button"
-          className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-fg-muted transition-colors hover:bg-accent-subtle hover:text-accent"
-          onClick={onAddAccount}
-        >
-          <Plus className="size-3.5" />
-          Add account
-        </button>
-      </div>
-    </div>
+  // Fetch folders only for the selected account.
+  const folderQuery = api.mail.listFolders.useQuery(
+    { accountId: selectedAccountId! },
+    { enabled: !!selectedAccountId },
   );
-}
+  const folders = (folderQuery.data ?? []) as MailFolderOutput[];
 
-function AccountSection({
-  account,
-  isSelected,
-  selectedFolderId,
-  onSelectAccount,
-  onSelectFolder,
-  showSeparator,
-}: {
-  account: MailAccountOutput;
-  isSelected: boolean;
-  selectedFolderId: string | null;
-  onSelectAccount: (id: string) => void;
-  onSelectFolder: (id: string) => void;
-  showSeparator: boolean;
-}) {
-  const [expanded, setExpanded] = useState(true);
+  const syncMutation = api.mail.triggerSync.useMutation();
 
-  const { data: foldersData, isLoading: foldersLoading } =
-    api.mail.listFolders.useQuery(
-      { accountId: account.id },
-      { enabled: expanded },
-    );
-  const folders = (foldersData?.data ?? []) as MailFolderOutput[];
+  // Auto-select inbox folder when folders load for the active account.
+  const autoSelectedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedFolderId || !selectedAccountId) return;
+    if (folders.length === 0) return;
+    if (autoSelectedRef.current === selectedAccountId) return;
+    const inbox = folders.find((f) => f.folderType === "inbox");
+    const target = inbox ?? folders[0];
+    autoSelectedRef.current = selectedAccountId;
+    onSelectFolder(target.id);
+  }, [selectedAccountId, selectedFolderId, folders, onSelectFolder]);
 
-  const syncFolders = api.mail.syncFolders.useMutation();
+  // ── Build sidebar sections ──────────────────────────────────────────────
 
-  return (
-    <div>
-      {showSeparator && (
-        <div className="my-1 mx-3 border-t border-black/[0.06] dark:border-white/[0.08]" />
-      )}
-
-      {/* Account header */}
-      <div
-        className={cn(
-          "mb-0.5 flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-sm transition-colors",
-          isSelected
-            ? "bg-black/[0.06] font-medium text-fg-primary dark:bg-white/[0.06]"
-            : "text-fg-muted hover:bg-black/[0.06] dark:hover:bg-white/[0.06]",
-        )}
-      >
-        <button
-          type="button"
-          className="flex flex-1 cursor-pointer items-center gap-1.5"
-          onClick={() => {
-            onSelectAccount(account.id);
-            setExpanded(!expanded);
-          }}
-        >
-          {expanded ? (
-            <ChevronDown className="size-3.5 shrink-0" />
-          ) : (
-            <ChevronRight className="size-3.5 shrink-0" />
-          )}
-          <Mail className="size-3.5 shrink-0" />
-          <span className="truncate">
-            {account.displayName || account.email}
-          </span>
-        </button>
-        <Tooltip title="Sync folders" placement="right">
-          <button
-            type="button"
-            className="cursor-pointer rounded p-0.5 text-fg-muted transition-colors hover:text-fg-primary"
-            onClick={(e) => {
-              e.stopPropagation();
-              syncFolders.mutate({ accountId: account.id });
+  const sections: AppSidebarSection[] = useMemo(() => {
+    // Section 1: Mail accounts (like video libraries)
+    const accountSection: AppSidebarSection = {
+      items: accounts.map((account, i) => ({
+        key: account.id,
+        icon: (
+          <div
+            className="flex size-7 items-center justify-center rounded-lg text-[11px] font-semibold text-white"
+            style={{
+              backgroundColor: ACCOUNT_COLORS[i % ACCOUNT_COLORS.length],
             }}
           >
+            {(account.displayName || account.email)[0].toUpperCase()}
+          </div>
+        ),
+        label: account.displayName || account.email,
+      })),
+    };
+
+    // Section 2: Folders of selected account
+    if (!selectedAccountId || folders.length === 0) {
+      return [accountSection];
+    }
+
+    const folderSection: AppSidebarSection = {
+      label: "Folders",
+      items: folderQuery.isLoading
+        ? [
+            {
+              key: "folders-loading",
+              icon: <Spin className="size-4" />,
+              label: "Loading...",
+            },
+          ]
+        : folders.map((folder) => {
+            const Icon = getFolderIcon(folder.folderType, folder.name);
+            return {
+              key: folder.id,
+              icon: <Icon className="size-4" />,
+              label: folder.name,
+              extra:
+                folder.unreadCount > 0 ? (
+                  <Badge count={folder.unreadCount} size="small" />
+                ) : undefined,
+            };
+          }),
+    };
+
+    return [accountSection, folderSection];
+  }, [accounts, selectedAccountId, folders, folderQuery.isLoading]);
+
+  // ── Selection handler ───────────────────────────────────────────────────
+
+  const handleSelect = (key: string) => {
+    // Check if this key is an account ID.
+    const isAccount = accounts.some((a) => a.id === key);
+    if (isAccount) {
+      if (key !== selectedAccountId) {
+        onSelectAccount(key);
+        autoSelectedRef.current = null;
+      }
+    } else {
+      onSelectFolder(key);
+    }
+  };
+
+  // ── Active key: prefer folder, otherwise account ────────────────────────
+  const activeKey = selectedFolderId ?? selectedAccountId ?? undefined;
+
+  // ── Footer ──────────────────────────────────────────────────────────────
+
+  const collapsedFooter = (
+    <div className="flex flex-col items-center gap-1">
+      <Tooltip title="Compose" placement="right">
+        <button
+          type="button"
+          onClick={onCompose}
+          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-fg-muted transition-all hover:bg-black/[0.08] hover:text-fg-secondary dark:hover:bg-white/[0.08]"
+        >
+          <Pencil className="size-4" />
+        </button>
+      </Tooltip>
+      <Tooltip title="Add account" placement="right">
+        <button
+          type="button"
+          onClick={onAddAccount}
+          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-fg-muted transition-all hover:bg-black/[0.08] hover:text-fg-secondary dark:hover:bg-white/[0.08]"
+        >
+          <Plus className="size-4" />
+        </button>
+      </Tooltip>
+      {selectedAccountId && (
+        <Tooltip title="Sync" placement="right">
+          <button
+            type="button"
+            onClick={() => syncMutation.mutate(selectedAccountId)}
+            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-fg-muted transition-all hover:bg-black/[0.08] hover:text-fg-secondary dark:hover:bg-white/[0.08]"
+          >
             <RefreshCw
-              className={cn("size-3", syncFolders.isPending && "animate-spin")}
+              className={`size-4 ${syncMutation.isPending ? "animate-spin" : ""}`}
             />
           </button>
         </Tooltip>
-      </div>
-
-      {/* Folder list */}
-      {expanded && (
-        <div className="ml-3 mt-0.5">
-          {foldersLoading ? (
-            <div className="flex items-center justify-center py-2">
-              <Spin className="size-4" />
-            </div>
-          ) : (
-            folders.map((folder) => {
-              const Icon = getFolderIcon(folder.folderType, folder.name);
-              return (
-                <button
-                  key={folder.id}
-                  type="button"
-                  className={cn(
-                    "mb-0.5 flex w-full cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors",
-                    selectedFolderId === folder.id
-                      ? "bg-accent-subtle font-medium text-accent"
-                      : "text-fg-muted hover:bg-black/[0.06] dark:hover:bg-white/[0.06]",
-                  )}
-                  onClick={() => onSelectFolder(folder.id)}
-                >
-                  <Icon className="size-3.5 shrink-0" />
-                  <span className="flex-1 truncate text-left">
-                    {folder.name}
-                  </span>
-                  {folder.unreadCount > 0 && (
-                    <Badge count={folder.unreadCount} size="small" />
-                  )}
-                </button>
-              );
-            })
-          )}
-        </div>
       )}
+      <Tooltip title="Expand sidebar" placement="right">
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-fg-muted transition-all hover:bg-black/[0.08] hover:text-fg-secondary dark:hover:bg-white/[0.08]"
+        >
+          <PanelLeft className="size-4" />
+        </button>
+      </Tooltip>
     </div>
+  );
+
+  const fullFooter = (
+    <div className="flex items-center gap-1">
+      <Tooltip title="Compose">
+        <button
+          type="button"
+          onClick={onCompose}
+          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-fg-muted transition-all hover:bg-black/[0.08] hover:text-fg-secondary dark:hover:bg-white/[0.08]"
+        >
+          <Pencil className="size-4" />
+        </button>
+      </Tooltip>
+      <Tooltip title="Add account">
+        <button
+          type="button"
+          onClick={onAddAccount}
+          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-fg-muted transition-all hover:bg-black/[0.08] hover:text-fg-secondary dark:hover:bg-white/[0.08]"
+        >
+          <Plus className="size-4" />
+        </button>
+      </Tooltip>
+      {selectedAccountId && (
+        <Tooltip title="Sync">
+          <button
+            type="button"
+            onClick={() => syncMutation.mutate(selectedAccountId)}
+            className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-fg-muted transition-all hover:bg-black/[0.08] hover:text-fg-secondary dark:hover:bg-white/[0.08]"
+          >
+            <RefreshCw
+              className={`size-4 ${syncMutation.isPending ? "animate-spin" : ""}`}
+            />
+          </button>
+        </Tooltip>
+      )}
+      <Tooltip title="Collapse sidebar">
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="ml-auto flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-fg-muted transition-all hover:bg-black/[0.08] hover:text-fg-secondary dark:hover:bg-white/[0.08]"
+        >
+          <PanelLeftClose className="size-4" />
+        </button>
+      </Tooltip>
+    </div>
+  );
+
+  return (
+    <AppSidebar
+      sections={sections}
+      activeKey={activeKey}
+      onSelect={handleSelect}
+      collapsed={collapsed}
+      footer={collapsed ? collapsedFooter : fullFooter}
+    />
   );
 }

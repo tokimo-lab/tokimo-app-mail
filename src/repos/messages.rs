@@ -1,10 +1,48 @@
 use chrono::{DateTime, FixedOffset};
-use sea_orm::sea_query::Expr;
+use sea_orm::sea_query::{Expr, NullOrdering};
 use sea_orm::*;
 use uuid::Uuid;
 
 use crate::db::entities::{mail_attachments, mail_messages};
 use crate::error::AppError;
+
+/// Get the maximum IMAP UID stored for a given account+folder.
+/// Returns `None` if no messages exist yet (first sync).
+pub async fn max_uid_in_folder(
+    db: &DatabaseConnection,
+    account_id: Uuid,
+    folder_id: Uuid,
+) -> Result<Option<i32>, AppError> {
+    let result = mail_messages::Entity::find()
+        .filter(mail_messages::Column::AccountId.eq(account_id))
+        .filter(mail_messages::Column::FolderId.eq(folder_id))
+        .select_only()
+        .column_as(mail_messages::Column::Uid.max(), "max_uid")
+        .into_tuple::<Option<i32>>()
+        .one(db)
+        .await
+        .map_err(AppError::Database)?;
+    Ok(result.flatten())
+}
+
+/// Get the minimum IMAP UID stored for a given account+folder.
+/// Used to initialize the history sync cursor.
+pub async fn min_uid_in_folder(
+    db: &DatabaseConnection,
+    account_id: Uuid,
+    folder_id: Uuid,
+) -> Result<Option<i32>, AppError> {
+    let result = mail_messages::Entity::find()
+        .filter(mail_messages::Column::AccountId.eq(account_id))
+        .filter(mail_messages::Column::FolderId.eq(folder_id))
+        .select_only()
+        .column_as(mail_messages::Column::Uid.min(), "min_uid")
+        .into_tuple::<Option<i32>>()
+        .one(db)
+        .await
+        .map_err(AppError::Database)?;
+    Ok(result.flatten())
+}
 
 pub async fn list_by_folder(
     db: &DatabaseConnection,
@@ -21,7 +59,7 @@ pub async fn list_by_folder(
     let offset = u64::from((page - 1) * page_size);
     let messages = mail_messages::Entity::find()
         .filter(mail_messages::Column::FolderId.eq(folder_id))
-        .order_by_desc(mail_messages::Column::Date)
+        .order_by_with_nulls(mail_messages::Column::Date, Order::Desc, NullOrdering::Last)
         .order_by_desc(mail_messages::Column::Uid)
         .offset(offset)
         .limit(u64::from(page_size))
@@ -177,7 +215,7 @@ pub async fn search(
                 .add(mail_messages::Column::Preview.like(&pattern))
                 .add(mail_messages::Column::TextBody.like(&pattern)),
         )
-        .order_by_desc(mail_messages::Column::Date)
+        .order_by_with_nulls(mail_messages::Column::Date, Order::Desc, NullOrdering::Last)
         .limit(100)
         .all(db)
         .await

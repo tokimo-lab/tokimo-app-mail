@@ -14,6 +14,7 @@ use super::super::services;
 // ── DTOs ─────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct MailFolderOutput {
     pub id: String,

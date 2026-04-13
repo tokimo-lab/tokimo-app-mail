@@ -23,6 +23,7 @@ pub struct MailAddressOutput {
 }
 
 #[derive(Debug, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct MailMessageSummaryOutput {
     pub id: String,
@@ -43,6 +44,7 @@ pub struct MailMessageSummaryOutput {
 }
 
 #[derive(Debug, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct MailMessageListOutput {
     pub messages: Vec<MailMessageSummaryOutput>,
@@ -51,6 +53,7 @@ pub struct MailMessageListOutput {
 }
 
 #[derive(Debug, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct MailAttachmentOutput {
     pub id: String,
@@ -63,6 +66,7 @@ pub struct MailAttachmentOutput {
 }
 
 #[derive(Debug, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct MailMessageFullOutput {
     pub id: String,

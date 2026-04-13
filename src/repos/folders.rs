@@ -74,6 +74,7 @@ pub async fn upsert(
         uid_validity: Set(None),
         uid_next: Set(None),
         sort_order: Set(sort_order),
+        history_sync_cursor: Set(None),
         updated_at: Set(now),
     };
     mail_folders::Entity::insert(model)

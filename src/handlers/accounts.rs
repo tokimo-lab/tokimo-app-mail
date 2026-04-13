@@ -17,6 +17,7 @@ use super::super::services;
 // ── DTOs ─────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct MailProviderPresetOutput {
     pub provider: String,
@@ -36,6 +37,7 @@ pub struct MailProviderPresetOutput {
 }
 
 #[derive(Debug, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct MailAccountOutput {
     pub id: String,
@@ -246,7 +248,7 @@ pub async fn test_connection(
     Ok(ok(()))
 }
 
-/// POST /api/apps/mail/accounts/:id/sync — trigger immediate sync.
+/// POST /api/apps/mail/accounts/:id/sync — kick off a background sync and return immediately.
 pub async fn trigger_sync(
     State(state): State<Arc<AppState>>,
     AuthUser(user): AuthUser,
@@ -259,6 +261,11 @@ pub async fn trigger_sync(
     let account_id: Uuid = id
         .parse()
         .map_err(|_| AppError::BadRequest("invalid account id".into()))?;
-    services::sync::sync_account(&state.db, uid, account_id).await?;
+    let db = state.db.clone();
+    tokio::spawn(async move {
+        if let Err(e) = services::sync::sync_account(&db, uid, account_id).await {
+            tracing::warn!("Background mail sync failed for account {account_id}: {e}");
+        }
+    });
     Ok(ok(()))
 }

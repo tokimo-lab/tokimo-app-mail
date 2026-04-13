@@ -109,7 +109,7 @@ export interface MailMessageFullOutput {
 
 // ── Input types ──────────────────────────────────────────────────────────────
 
-interface CreateAccountInput {
+export interface CreateAccountInput {
   display_name: string;
   email: string;
   provider?: string;
@@ -127,7 +127,7 @@ interface CreateAccountInput {
   sync_interval?: number;
 }
 
-interface UpdateAccountInput {
+export interface UpdateAccountInput {
   id: string;
   display_name?: string;
   imap_host?: string;
@@ -152,7 +152,7 @@ interface ListMessagesInput {
   pageSize?: number;
 }
 
-interface SendMessageInput {
+export interface SendMessageInput {
   accountId: string;
   to: string[];
   cc?: string[];
@@ -288,17 +288,3 @@ export const mailApi = {
     },
   }),
 } as const;
-
-export type {
-  CreateAccountInput,
-  MailAccountOutput,
-  MailAddressOutput,
-  MailAttachmentOutput,
-  MailFolderOutput,
-  MailMessageFullOutput,
-  MailMessageListOutput,
-  MailMessageSummaryOutput,
-  MailProviderPresetOutput,
-  SendMessageInput,
-  UpdateAccountInput,
-};
