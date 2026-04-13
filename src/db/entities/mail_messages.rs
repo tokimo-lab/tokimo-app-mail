@@ -8,8 +8,11 @@ use serde::{Deserialize, Serialize};
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: Uuid,
+    #[sea_orm(unique_key = "mail_messages_account_id_folder_id_uid_key")]
     pub account_id: Uuid,
+    #[sea_orm(unique_key = "mail_messages_account_id_folder_id_uid_key")]
     pub folder_id: Uuid,
+    #[sea_orm(unique_key = "mail_messages_account_id_folder_id_uid_key")]
     pub uid: i32,
     #[sea_orm(column_type = "Text", nullable)]
     pub message_id: Option<String>,

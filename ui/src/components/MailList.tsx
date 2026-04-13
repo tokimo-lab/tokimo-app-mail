@@ -1,5 +1,5 @@
-import { cn, ScrollArea, Spin } from "@tokiomo/components";
-import { Paperclip, Star } from "lucide-react";
+import { cn, Empty, ScrollArea, Spin } from "@tokiomo/components";
+import { Inbox, Paperclip, Star } from "lucide-react";
 import { api } from "@/generated/rust-api";
 import type { MailMessageSummaryOutput } from "@/generated/rust-api/mail";
 
@@ -26,7 +26,7 @@ export function MailList({
 
   if (isLoading) {
     return (
-      <div className="flex w-80 shrink-0 items-center justify-center border-r border-border">
+      <div className="flex w-80 shrink-0 items-center justify-center border-r border-border-base">
         <Spin className="size-5" />
       </div>
     );
@@ -34,23 +34,26 @@ export function MailList({
 
   if (messages.length === 0) {
     return (
-      <div className="flex w-80 shrink-0 items-center justify-center border-r border-border text-sm text-muted-foreground">
-        No messages
+      <div className="flex w-80 shrink-0 items-center justify-center border-r border-border-base">
+        <Empty
+          image={<Inbox className="size-10 stroke-1" />}
+          description="No messages"
+        />
       </div>
     );
   }
 
   return (
-    <div className="flex w-80 shrink-0 flex-col border-r border-border">
+    <div className="flex w-80 shrink-0 flex-col border-r border-border-base">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <span className="text-sm font-medium text-foreground">
+      <div className="flex items-center justify-between border-b border-border-base px-3 py-2">
+        <span className="text-sm font-medium text-fg-primary">
           {total} messages
         </span>
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="divide-y divide-border">
+        <div className="divide-y divide-border-subtle">
           {messages.map((msg) => (
             <MessageRow
               key={msg.id}
@@ -88,8 +91,10 @@ function MessageRow({
       type="button"
       className={cn(
         "flex w-full cursor-pointer flex-col gap-0.5 px-3 py-2 text-left transition-colors",
-        isSelected ? "bg-primary/10" : "hover:bg-accent/50",
-        !message.isRead && "bg-accent/30",
+        isSelected
+          ? "bg-accent-subtle"
+          : "hover:bg-black/[0.04] dark:hover:bg-white/[0.04]",
+        !message.isRead && "bg-fill-tertiary",
       )}
       onClick={onClick}
     >
@@ -98,13 +103,13 @@ function MessageRow({
           className={cn(
             "truncate text-sm",
             !message.isRead
-              ? "font-semibold text-foreground"
-              : "text-foreground",
+              ? "font-semibold text-fg-primary"
+              : "text-fg-primary",
           )}
         >
           {fromDisplay}
         </span>
-        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
+        <span className="ml-auto shrink-0 text-xs text-fg-muted">
           {dateStr}
         </span>
       </div>
@@ -113,8 +118,8 @@ function MessageRow({
           className={cn(
             "truncate text-sm",
             !message.isRead
-              ? "font-medium text-foreground"
-              : "text-muted-foreground",
+              ? "font-medium text-fg-primary"
+              : "text-fg-muted",
           )}
         >
           {message.subject || "(no subject)"}
@@ -123,13 +128,11 @@ function MessageRow({
           <Star className="size-3 shrink-0 fill-yellow-400 text-yellow-400" />
         )}
         {message.hasAttachments && (
-          <Paperclip className="size-3 shrink-0 text-muted-foreground" />
+          <Paperclip className="size-3 shrink-0 text-fg-muted" />
         )}
       </div>
       {message.preview && (
-        <p className="truncate text-xs text-muted-foreground">
-          {message.preview}
-        </p>
+        <p className="truncate text-xs text-fg-muted">{message.preview}</p>
       )}
     </button>
   );

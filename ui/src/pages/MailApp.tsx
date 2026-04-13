@@ -1,3 +1,5 @@
+import { Empty, Spin } from "@tokiomo/components";
+import { Mail } from "lucide-react";
 import { useState } from "react";
 import { AccountSetup } from "../components/AccountSetup";
 import { MailComposer } from "../components/MailComposer";
@@ -26,7 +28,7 @@ export default function MailApp() {
   if (accountsLoading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="text-muted-foreground text-sm">Loading...</div>
+        <Spin />
       </div>
     );
   }
@@ -90,8 +92,11 @@ export default function MailApp() {
         />
       ) : (
         !selectedFolderId && (
-          <div className="flex flex-1 items-center justify-center text-muted-foreground">
-            Select a folder to view messages
+          <div className="flex flex-1 items-center justify-center">
+            <Empty
+              image={<Mail className="size-12 stroke-1" />}
+              description="Select a folder to view messages"
+            />
           </div>
         )
       )}
