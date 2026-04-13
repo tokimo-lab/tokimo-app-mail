@@ -15,6 +15,7 @@ import type {
   MailAddressOutput,
   MailMessageFullOutput,
 } from "@/generated/rust-api/mail";
+import { useDateFormat } from "@/system/appearance/ThemeContext";
 
 interface MailViewerProps {
   messageId: string;
@@ -24,6 +25,7 @@ interface MailViewerProps {
 
 export function MailViewer({ messageId, onReply, onClose }: MailViewerProps) {
   const shadowHostRef = useRef<HTMLDivElement>(null);
+  const { formatLong } = useDateFormat();
 
   const { data, isLoading } = api.mail.getMessage.useQuery(
     { messageId },
@@ -156,7 +158,7 @@ export function MailViewer({ messageId, onReply, onClose }: MailViewerProps) {
               <div className="flex gap-2">
                 <span className="shrink-0 text-fg-muted">Date:</span>
                 <span className="text-fg-primary">
-                  {new Date(message.date).toLocaleString()}
+                  {formatLong(message.date)}
                 </span>
               </div>
             )}
@@ -268,6 +270,21 @@ function luminance(rgb: [number, number, number]): number {
   return (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
 }
 
+/** True if the colour is achromatic (gray/black/white). Max channel diff ≤ 30. */
+function isGray(rgb: [number, number, number]): boolean {
+  const max = Math.max(...rgb);
+  const min = Math.min(...rgb);
+  return max - min <= 30;
+}
+
+const BORDER_COLOR_PROPS = [
+  "border-color",
+  "border-top-color",
+  "border-right-color",
+  "border-bottom-color",
+  "border-left-color",
+] as const;
+
 /**
  * Sanitize HTML email content with DOMPurify.
  *
@@ -278,9 +295,13 @@ function luminance(rgb: [number, number, number]): number {
  * - Forces target="_blank" rel="noopener noreferrer" on all links
  *
  * Theme adaptation:
- * - Strips inline color if dark (luminance < 0.25) → falls back to --text-primary
+ * - Strips inline color if dark (luminance < 0.25) → inherit --text-primary
+ * - Replaces inline gray text (luminance 0.25-0.65) → --text-secondary
  * - Strips inline background-color if light (luminance > 0.85) → transparent
- * - Preserves intentional brand/accent colors
+ * - Strips inline border colors if near-gray (luminance 0.65-0.95) → inherit --border-base
+ * - Strips bgcolor HTML attribute if near-white
+ * - Strips <font color> HTML attribute if near-black
+ * - Preserves intentional brand/accent colors (saturated hues)
  */
 function sanitizeHtml(html: string): string {
   DOMPurify.addHook("afterSanitizeAttributes", (node) => {
@@ -290,16 +311,44 @@ function sanitizeHtml(html: string): string {
       node.setAttribute("rel", "noopener noreferrer");
     }
 
-    // Neutralise "theme-bound" inline colors so the app theme takes over
+    // --- HTML attributes (non-style) ---
+
+    // <table bgcolor="#fff"> / <td bgcolor="#ffffff">
+    if (node instanceof HTMLElement && node.hasAttribute("bgcolor")) {
+      const rgb = parseColorRGB(node.getAttribute("bgcolor")!);
+      if (rgb && luminance(rgb) > 0.85) {
+        node.removeAttribute("bgcolor");
+      }
+    }
+
+    // <font color="#000000">
+    if (node.tagName === "FONT" && node.hasAttribute("color")) {
+      const rgb = parseColorRGB(node.getAttribute("color")!);
+      if (rgb) {
+        const lum = luminance(rgb);
+        if (lum < 0.25 || isGray(rgb)) {
+          node.removeAttribute("color");
+        }
+      }
+    }
+
+    // --- Inline styles ---
     if (node instanceof HTMLElement && node.style) {
+      // Text color: dark → remove; gray → --text-secondary
       const color = node.style.color;
       if (color) {
         const rgb = parseColorRGB(color);
-        if (rgb && luminance(rgb) < 0.25) {
-          node.style.removeProperty("color");
+        if (rgb && isGray(rgb)) {
+          const lum = luminance(rgb);
+          if (lum < 0.25) {
+            node.style.removeProperty("color");
+          } else if (lum < 0.65) {
+            node.style.setProperty("color", "var(--text-secondary)");
+          }
         }
       }
 
+      // Background: light → remove
       const bg = node.style.backgroundColor;
       if (bg) {
         const rgb = parseColorRGB(bg);
@@ -307,14 +356,28 @@ function sanitizeHtml(html: string): string {
           node.style.removeProperty("background-color");
         }
       }
-
-      // Shorthand "background" — only strip if it's a plain light colour
       const bgShort = node.style.background;
       if (bgShort) {
         const rgb = parseColorRGB(bgShort);
         if (rgb && luminance(rgb) > 0.85) {
           node.style.removeProperty("background");
         }
+      }
+
+      // Border colors: gray → remove (inherit from --border-base via Shadow CSS)
+      for (const prop of BORDER_COLOR_PROPS) {
+        const val = node.style.getPropertyValue(prop);
+        if (val) {
+          const rgb = parseColorRGB(val);
+          if (rgb && isGray(rgb) && luminance(rgb) > 0.65) {
+            node.style.removeProperty(prop);
+          }
+        }
+      }
+
+      // box-shadow: strip entirely (doesn't adapt well to theme changes)
+      if (node.style.boxShadow) {
+        node.style.removeProperty("box-shadow");
       }
     }
   });
@@ -395,16 +458,34 @@ function sanitizeHtml(html: string): string {
  * `body { color: #000; background: #fff; }`.
  */
 function neutralizeStyleBlock(css: string): string {
-  // Remove color declarations with dark values
-  return css
-    .replace(
-      /\bcolor\s*:\s*(#0{3,6}|black|rgb\(\s*0\s*,\s*0\s*,\s*0\s*\))\s*(;|(?=\}))/gi,
-      "color: inherit;",
-    )
-    .replace(
-      /\bbackground(-color)?\s*:\s*(#f{3,6}|white|#fafafa|#f5f5f5|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))\s*(;|(?=\}))/gi,
-      "background-color: transparent;",
-    );
+  return (
+    css
+      // Dark text → inherit
+      .replace(
+        /\bcolor\s*:\s*(#(?:0{3,6}|1a1a1a|222(?:222)?|333(?:333)?)|black|rgb\(\s*0\s*,\s*0\s*,\s*0\s*\))\s*(;|(?=\}))/gi,
+        "color: inherit;",
+      )
+      // Gray text → --text-secondary
+      .replace(
+        /\bcolor\s*:\s*#(?:666(?:666)?|777(?:777)?|888(?:888)?|999(?:999)?)\s*(;|(?=\}))/gi,
+        "color: var(--text-secondary);",
+      )
+      // Light backgrounds → transparent
+      .replace(
+        /\bbackground(-color)?\s*:\s*(#(?:f{3,6}|fafafa|f5f5f5|f0f0f0|e8e8e8|eee(?:eee)?)|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))\s*(;|(?=\}))/gi,
+        "background-color: transparent;",
+      )
+      // Gray border colors → --border-base
+      .replace(
+        /\bborder(-top|-right|-bottom|-left)?-color\s*:\s*#(?:[cd]\1{2,5}|e[0-9a-e]{2}(?:[0-9a-e]{3})?|ddd(?:ddd)?|ccc(?:ccc)?)\s*(;|(?=\}))/gi,
+        (_m, side) => `border${side || ""}-color: var(--border-base);`,
+      )
+      // border shorthand with gray color: "1px solid #eee" → "1px solid var(--border-base)"
+      .replace(
+        /\bborder(-top|-right|-bottom|-left)?\s*:\s*(\d+px\s+\w+\s+)#(?:[cd][cd][cd](?:[cd]{3})?|e[0-9a-e]{2}(?:[0-9a-e]{3})?|ddd(?:ddd)?)/gi,
+        (_, side, prefix) => `border${side || ""}: ${prefix}var(--border-base)`,
+      )
+  );
 }
 
 function buildShadowContent(sanitizedHtml: string): string {
@@ -420,10 +501,12 @@ function buildShadowContent(sanitizedHtml: string): string {
   .mail-body img { max-width: 100%; height: auto; }
   .mail-body a { color: var(--accent); }
   .mail-body table { max-width: 100% !important; border-collapse: collapse; }
+  .mail-body td, .mail-body th { border-color: var(--border-base); }
   .mail-body pre { white-space: pre-wrap; word-wrap: break-word; max-width: 100%; overflow-x: auto; }
   .mail-body blockquote { margin: 8px 0; padding-left: 12px; border-left: 3px solid var(--border-base); color: var(--text-muted); }
   .mail-body * { box-sizing: border-box; }
   .mail-body hr { border-color: var(--border-base); }
+  .mail-body font { color: inherit; }
 </style>
 <div class="mail-body">${processed}</div>`;
 }
