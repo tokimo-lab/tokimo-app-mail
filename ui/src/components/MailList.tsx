@@ -1,9 +1,21 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { cn, Empty, ScrollArea, Spin } from "@tokiomo/components";
-import { Inbox, Paperclip, RefreshCw, Star } from "lucide-react";
+import {
+  cn,
+  Empty,
+  ScrollArea,
+  type ScrollAreaRef,
+  Spin,
+} from "@tokiomo/components";
+import { Inbox, Paperclip, Star } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/generated/rust-api";
-import type { MailMessageSummaryOutput } from "@/generated/rust-api/mail";
+import type {
+  MailMessageListOutput,
+  MailMessageSummaryOutput,
+} from "@/generated/rust-api/mail";
+
+const PAGE_SIZE = 50;
+const LOAD_THRESHOLD = 120; // px from bottom to trigger next page
 
 interface MailListProps {
   accountId: string;
@@ -18,61 +30,114 @@ export function MailList({
   selectedMessageId,
   onSelectMessage,
 }: MailListProps) {
-  const queryClient = useQueryClient();
-  // Poll for a short window after triggering sync to pick up new messages.
-  const [isSyncing, setIsSyncing] = useState(false);
-  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [page, setPage] = useState(1);
+  const [allMessages, setAllMessages] = useState<MailMessageSummaryOutput[]>(
+    [],
+  );
+  const [hasMore, setHasMore] = useState(true);
+  const prevFolderRef = useRef<string | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const scrollAreaRef = useRef<ScrollAreaRef | null>(null);
+  const isFetchingRef = useRef(false);
+  const hasMoreRef = useRef(true);
 
-  const { data, isLoading } = api.mail.listMessages.useQuery(
-    { accountId, folderId, page: 1, pageSize: 50 },
+  // Reset when folder changes.
+  useEffect(() => {
+    const key = `${accountId}/${folderId}`;
+    if (key === prevFolderRef.current) return;
+    prevFolderRef.current = key;
+    setPage(1);
+    setAllMessages([]);
+    setHasMore(true);
+    hasMoreRef.current = true;
+  }, [accountId, folderId]);
+
+  const { data, isFetching, isLoading } = api.mail.listMessages.useQuery(
+    { accountId, folderId, page, pageSize: PAGE_SIZE },
     {
       enabled: !!accountId && !!folderId,
-      staleTime: 60_000,
-      refetchOnMount: true,
+      staleTime: Number.POSITIVE_INFINITY,
+      refetchOnMount: false,
       refetchOnWindowFocus: false,
-      // While syncing, poll every 3 s to detect new messages.
-      refetchInterval: isSyncing ? 3_000 : false,
     },
   );
 
-  const triggerSync = api.mail.triggerSync.useMutation({
-    onSuccess: () => {
-      // Start polling for up to 20 s to pick up newly synced messages.
-      setIsSyncing(true);
-      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-      syncTimerRef.current = setTimeout(() => {
-        setIsSyncing(false);
-        api.mail.listMessages.invalidate(queryClient);
-        api.mail.listFolders.invalidate(queryClient);
-      }, 20_000);
-    },
-  });
+  // Keep refs in sync so the scroll handler (stable closure) can access latest values.
+  isFetchingRef.current = isFetching;
+  hasMoreRef.current = hasMore;
 
-  // Stop polling when the component unmounts.
+  // Append newly fetched page to accumulated list.
   useEffect(() => {
-    return () => {
-      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
-    };
+    if (!data) return;
+    const fetched = data.messages as MailMessageSummaryOutput[];
+    setAllMessages((prev) => (page === 1 ? fetched : [...prev, ...fetched]));
+    const more = fetched.length === PAGE_SIZE;
+    setHasMore(more);
+    hasMoreRef.current = more;
+  }, [data, page]);
+
+  // ScrollArea uses CSS transform — IntersectionObserver won't work.
+  // Instead, detect near-bottom via onScrollChange (scrollY) + sentinel offsetTop.
+  const handleScrollChange = useCallback((_x: number, scrollY: number) => {
+    if (!hasMoreRef.current || isFetchingRef.current) return;
+    const sentinel = sentinelRef.current;
+    const viewport = scrollAreaRef.current?.getViewportRect();
+    if (!sentinel || !viewport) return;
+    const viewportHeight = viewport.height;
+    // sentinel.offsetTop is its distance from the content container top.
+    if (scrollY + viewportHeight >= sentinel.offsetTop - LOAD_THRESHOLD) {
+      setPage((p) => p + 1);
+    }
   }, []);
 
-  // Trigger a background sync every time the folder changes.
-  const prevFolderRef = useRef<string | null>(null);
-  const syncMutate = triggerSync.mutate;
-  useEffect(() => {
-    if (accountId && folderId && folderId !== prevFolderRef.current) {
-      prevFolderRef.current = folderId;
-      syncMutate(accountId);
-    }
-  }, [accountId, folderId, syncMutate]);
+  // Optimistic read state: update React Query cache directly so state
+  // survives folder switches without any re-sync.
+  const queryClient = useQueryClient();
+  const markReadMutation = api.mail.markRead.useMutation();
 
-  const handleRefresh = useCallback(() => {
-    triggerSync.mutate(accountId);
-  }, [accountId, triggerSync]);
+  const markAsReadInCache = useCallback(
+    (id: string) => {
+      // Update every cached page for this folder.
+      for (let p = 1; p <= page; p++) {
+        const key = api.mail.listMessages.queryKey({
+          accountId,
+          folderId,
+          page: p,
+          pageSize: PAGE_SIZE,
+        });
+        queryClient.setQueryData<MailMessageListOutput>(key, (old) => {
+          if (!old) return old;
+          const found = old.messages.some((m) => m.id === id && !m.isRead);
+          if (!found) return old;
+          return {
+            ...old,
+            messages: old.messages.map((m) =>
+              m.id === id ? { ...m, isRead: true } : m,
+            ),
+          };
+        });
+      }
+    },
+    [accountId, folderId, page, queryClient],
+  );
 
-  const messages = (data?.messages ?? []) as MailMessageSummaryOutput[];
+  const handleSelectMessage = useCallback(
+    (id: string) => {
+      // Update local list immediately (no re-render lag).
+      setAllMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, isRead: true } : m)),
+      );
+      markAsReadInCache(id);
+      // Fire-and-forget to server for persistence.
+      markReadMutation.mutate({ message_ids: [id] });
+      onSelectMessage(id);
+    },
+    [markAsReadInCache, markReadMutation, onSelectMessage],
+  );
+
   const total = data?.total ?? 0;
 
-  if (isLoading) {
+  if (isLoading && page === 1) {
     return (
       <div className="flex h-full w-72 shrink-0 items-center justify-center border-r border-border-base">
         <Spin className="size-5" />
@@ -80,7 +145,7 @@ export function MailList({
     );
   }
 
-  if (messages.length === 0) {
+  if (allMessages.length === 0 && !isFetching) {
     return (
       <div className="flex h-full w-72 shrink-0 items-center justify-center border-r border-border-base">
         <Empty
@@ -94,36 +159,35 @@ export function MailList({
   return (
     <div className="flex h-full w-72 shrink-0 flex-col border-r border-border-base">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border-base px-3 py-2">
+      <div className="border-b border-border-base px-3 py-2">
         <span className="text-sm font-medium text-fg-primary">
           {total} messages
         </span>
-        <button
-          type="button"
-          className="cursor-pointer rounded p-1 text-fg-muted transition-colors hover:text-fg-primary"
-          onClick={handleRefresh}
-          disabled={triggerSync.isPending}
-        >
-          <RefreshCw
-            className={cn(
-              "size-3.5",
-              (triggerSync.isPending || isSyncing) && "animate-spin",
-            )}
-          />
-        </button>
       </div>
 
-      <ScrollArea direction="vertical" className="flex-1">
+      <ScrollArea
+        ref={scrollAreaRef}
+        direction="vertical"
+        className="flex-1"
+        onScrollChange={handleScrollChange}
+      >
         <div className="divide-y divide-border-subtle">
-          {messages.map((msg) => (
+          {allMessages.map((msg) => (
             <MessageRow
               key={msg.id}
               message={msg}
               isSelected={selectedMessageId === msg.id}
-              onClick={() => onSelectMessage(msg.id)}
+              onClick={() => handleSelectMessage(msg.id)}
             />
           ))}
         </div>
+        {/* Sentinel: offsetTop used to detect near-bottom */}
+        <div ref={sentinelRef} className="h-1" />
+        {isFetching && page > 1 && (
+          <div className="flex justify-center py-3">
+            <Spin className="size-4" />
+          </div>
+        )}
       </ScrollArea>
     </div>
   );
@@ -138,6 +202,7 @@ function MessageRow({
   isSelected: boolean;
   onClick: () => void;
 }) {
+  const isUnread = !message.isRead;
   const fromDisplay =
     message.from.length > 0
       ? message.from[0].name || message.from[0].address
@@ -153,17 +218,20 @@ function MessageRow({
       className={cn(
         "flex w-full cursor-pointer flex-col gap-0.5 overflow-hidden px-3 py-2 text-left transition-colors",
         isSelected
-          ? "bg-accent-subtle"
+          ? "bg-[var(--accent)]/40"
           : "hover:bg-black/[0.04] dark:hover:bg-white/[0.04]",
-        !message.isRead && "bg-fill-tertiary",
+        !isSelected && isUnread && "bg-fill-tertiary",
       )}
       onClick={onClick}
     >
       <div className="flex items-center gap-2">
+        {isUnread && !isSelected && (
+          <span className="size-2 shrink-0 rounded-full bg-[var(--accent)]" />
+        )}
         <span
           className={cn(
             "truncate text-sm",
-            !message.isRead
+            isUnread || isSelected
               ? "font-semibold text-fg-primary"
               : "text-fg-primary",
           )}
@@ -178,7 +246,9 @@ function MessageRow({
         <span
           className={cn(
             "truncate text-sm",
-            !message.isRead ? "font-medium text-fg-primary" : "text-fg-muted",
+            isUnread || isSelected
+              ? "font-medium text-fg-primary"
+              : "text-fg-muted",
           )}
         >
           {message.subject || "(no subject)"}
