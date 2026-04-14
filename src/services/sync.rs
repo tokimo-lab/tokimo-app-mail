@@ -129,11 +129,17 @@ async fn sync_folder_messages(
     // cursor == None  → not started — initialize from the min UID we have
     // cursor == Some(0) → complete — skip
     // cursor == Some(n) → resume from UID n, crawl downward
-    let cursor = folder.history_sync_cursor;
-    if cursor != Some(0)
-        && let Err(e) = backfill_history(db, &client, account_id, folder, cursor).await
-    {
-        warn!("History backfill failed for folder '{}': {e}", folder.name);
+    let mut cursor = folder.history_sync_cursor;
+    while cursor != Some(0) {
+        match backfill_history(db, &client, account_id, folder, cursor).await {
+            Ok(new_cursor) => {
+                cursor = Some(new_cursor);
+            }
+            Err(e) => {
+                warn!("History backfill failed for folder '{}': {e}", folder.name);
+                break;
+            }
+        }
     }
 
     // ── Phase 3: Reconcile — remove locally cached messages deleted on server ──
@@ -190,7 +196,7 @@ async fn sync_folder_messages(
 ///
 /// Uses batch IMAP fetch (one connection per sub-batch of 50) instead of
 /// opening a separate connection for every single message.
-const FETCH_SUB_BATCH: usize = 50;
+const FETCH_SUB_BATCH: usize = 200;
 
 async fn sync_message_batch(
     db: &DatabaseConnection,
@@ -199,15 +205,16 @@ async fn sync_message_batch(
     folder: &mail_folders::Model,
     summaries: &[tokimo_mail::MailMessageSummary],
 ) -> Result<(), AppError> {
-    // 1. Filter to UIDs not yet in DB.
-    let mut missing_uids: Vec<u32> = Vec::new();
-    for summary in summaries {
-        let exists = repos::messages::exists_by_uid(db, account_id, folder.id, summary.uid as i32)
-            .await?;
-        if !exists {
-            missing_uids.push(summary.uid);
-        }
-    }
+    // 1. Bulk-check which UIDs already exist in DB (single query).
+    let candidate_uids: Vec<i32> = summaries.iter().map(|s| s.uid as i32).collect();
+    let existing = repos::messages::existing_uids_in_folder(
+        db, account_id, folder.id, &candidate_uids,
+    ).await?;
+    let missing_uids: Vec<u32> = summaries
+        .iter()
+        .filter(|s| !existing.contains(&(s.uid as i32)))
+        .map(|s| s.uid)
+        .collect();
 
     if missing_uids.is_empty() {
         return Ok(());
@@ -321,16 +328,15 @@ async fn store_full_message(
     Ok(())
 }
 
-/// Progressive history backfill — crawl backwards one batch per sync tick.
+/// Progressive history backfill — crawl backwards continuously.
 ///
 /// Uses `mail_folders.history_sync_cursor` to track progress:
 /// - `None` → first run: initialize cursor from the lowest UID in DB
 /// - `Some(n)` where n > 1 → fetch UIDs below `n`, update cursor
 /// - `Some(0)` → complete (caller should skip)
 ///
-/// Each tick fetches up to `HISTORY_BATCH_RANGE` UIDs going backwards.
-/// IMAP UIDs can have gaps, so the actual message count per batch varies.
-const HISTORY_BATCH_RANGE: u32 = 500;
+/// Returns the new cursor value so the caller can loop.
+const HISTORY_BATCH_RANGE: u32 = 2000;
 
 async fn backfill_history(
     db: &DatabaseConnection,
@@ -338,7 +344,7 @@ async fn backfill_history(
     account_id: Uuid,
     folder: &mail_folders::Model,
     cursor: Option<i32>,
-) -> Result<(), AppError> {
+) -> Result<i32, AppError> {
     // Determine starting cursor.
     let cursor_uid = match cursor {
         Some(c) if c > 0 => c as u32,
@@ -351,16 +357,16 @@ async fn backfill_history(
                 _ => {
                     // No messages or already at UID 1 — nothing to backfill.
                     update_history_cursor(db, folder, 0).await?;
-                    return Ok(());
+                    return Ok(0);
                 }
             }
         }
-        _ => return Ok(()), // cursor == Some(0): already complete
+        _ => return Ok(0), // cursor == Some(0): already complete
     };
 
     if cursor_uid <= 1 {
         update_history_cursor(db, folder, 0).await?;
-        return Ok(());
+        return Ok(0);
     }
 
     // Calculate UID range to fetch: [low, cursor_uid - 1]
@@ -397,7 +403,7 @@ async fn backfill_history(
         info!("Folder '{}': history sync complete", folder.name);
     }
 
-    Ok(())
+    Ok(new_cursor)
 }
 
 /// Persist the history sync cursor to the database.

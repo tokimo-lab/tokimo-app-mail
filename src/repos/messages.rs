@@ -96,6 +96,27 @@ pub async fn exists_by_uid(
     Ok(count > 0)
 }
 
+/// Return the set of UIDs that already exist in DB for a folder (bulk check).
+pub async fn existing_uids_in_folder(
+    db: &DatabaseConnection,
+    account_id: Uuid,
+    folder_id: Uuid,
+    uids: &[i32],
+) -> Result<std::collections::HashSet<i32>, AppError> {
+    use sea_orm::prelude::*;
+    let rows = mail_messages::Entity::find()
+        .select_only()
+        .column(mail_messages::Column::Uid)
+        .filter(mail_messages::Column::AccountId.eq(account_id))
+        .filter(mail_messages::Column::FolderId.eq(folder_id))
+        .filter(mail_messages::Column::Uid.is_in(uids.iter().copied()))
+        .into_tuple::<i32>()
+        .all(db)
+        .await
+        .map_err(AppError::Database)?;
+    Ok(rows.into_iter().collect())
+}
+
 /// Count unread messages in a folder.
 pub async fn count_unread(
     db: &DatabaseConnection,
