@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AppSidebar,
   type AppSidebarSection,
@@ -25,6 +26,7 @@ import type {
   MailAccountOutput,
   MailFolderOutput,
 } from "@/generated/rust-api/mail";
+import { useWs } from "@/system/events/ws";
 
 const FOLDER_ICONS: Record<string, typeof Inbox> = {
   inbox: Inbox,
@@ -87,6 +89,37 @@ export function MailSidebar({
   const folders = (folderQuery.data ?? []) as MailFolderOutput[];
 
   const syncMutation = api.mail.triggerSync.useMutation();
+
+  // Subscribe to mail:flags_synced to update badges via +/- arithmetic.
+  // The DB may not have all 60k messages yet, so we can't use absolute counts
+  // from the server. Instead, when IMAP flag sync detects changes, we adjust
+  // the local badge: +unreadUids.length, -readUids.length.
+  const queryClient = useQueryClient();
+  const ws = useWs();
+  useEffect(() => {
+    if (!selectedAccountId) return;
+    return ws.subscribe("mail:flags_synced", (msg) => {
+      const data = msg.data as {
+        accountId: string;
+        folderId: string;
+        readUids: number[];
+        unreadUids: number[];
+      };
+      if (data.accountId !== selectedAccountId) return;
+      const delta = data.unreadUids.length - data.readUids.length;
+      if (delta === 0) return;
+      const key = api.mail.listFolders.queryKey({
+        accountId: selectedAccountId,
+      });
+      queryClient.setQueryData<MailFolderOutput[]>(key, (old) => {
+        if (!old) return old;
+        return old.map((f) => {
+          if (f.id !== data.folderId) return f;
+          return { ...f, unreadCount: Math.max(0, f.unreadCount + delta) };
+        });
+      });
+    });
+  }, [selectedAccountId, ws, queryClient]);
 
   // Auto-select inbox folder when folders load for the active account.
   const autoSelectedRef = useRef<string | null>(null);

@@ -262,8 +262,9 @@ pub async fn trigger_sync(
         .parse()
         .map_err(|_| AppError::BadRequest("invalid account id".into()))?;
     let db = state.db.clone();
+    let event_tx = state.event_tx.clone();
     tokio::spawn(async move {
-        if let Err(e) = services::sync::sync_account(&db, uid, account_id).await {
+        if let Err(e) = services::sync::sync_account(&db, uid, account_id, Some(&event_tx)).await {
             tracing::warn!("Background mail sync failed for account {account_id}: {e}");
         }
     });

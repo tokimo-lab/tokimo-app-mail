@@ -1,3 +1,4 @@
+use sea_orm::sea_query::Expr;
 use sea_orm::*;
 use uuid::Uuid;
 
@@ -15,6 +16,33 @@ pub async fn list_by_account(
         .all(db)
         .await
         .map_err(AppError::Database)
+}
+
+pub async fn find_by_id(
+    db: &DatabaseConnection,
+    folder_id: Uuid,
+) -> Result<Option<mail_folders::Model>, AppError> {
+    mail_folders::Entity::find_by_id(folder_id)
+        .one(db)
+        .await
+        .map_err(AppError::Database)
+}
+
+/// Update folder's cached unread_count.
+pub async fn update_unread_count(
+    db: &DatabaseConnection,
+    folder_id: Uuid,
+    unread_count: i32,
+) -> Result<(), AppError> {
+    let now = chrono::Utc::now().fixed_offset();
+    mail_folders::Entity::update_many()
+        .filter(mail_folders::Column::Id.eq(folder_id))
+        .col_expr(mail_folders::Column::UnreadCount, Expr::value(unread_count))
+        .col_expr(mail_folders::Column::UpdatedAt, Expr::value(now))
+        .exec(db)
+        .await
+        .map_err(AppError::Database)?;
+    Ok(())
 }
 
 pub async fn find_by_name(

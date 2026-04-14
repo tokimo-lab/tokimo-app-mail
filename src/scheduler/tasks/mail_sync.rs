@@ -5,18 +5,21 @@ use std::time::Duration;
 use tracing::{debug, info, warn};
 
 use crate::apps::mail::repos;
+use crate::queue::AppEventSender;
 use crate::scheduler::ScheduledTask;
 
 /// Background task that periodically syncs all enabled mail accounts.
 pub struct MailSyncTask {
     db: DatabaseConnection,
+    event_tx: AppEventSender,
     is_running: AtomicBool,
 }
 
 impl MailSyncTask {
-    pub fn new(db: DatabaseConnection) -> Self {
+    pub fn new(db: DatabaseConnection, event_tx: AppEventSender) -> Self {
         Self {
             db,
+            event_tx,
             is_running: AtomicBool::new(false),
         }
     }
@@ -84,6 +87,7 @@ impl MailSyncTask {
                 &self.db,
                 account.user_id,
                 account.id,
+                Some(&self.event_tx),
             )
             .await
             {

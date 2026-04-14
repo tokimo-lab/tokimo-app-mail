@@ -96,6 +96,62 @@ pub async fn exists_by_uid(
     Ok(count > 0)
 }
 
+/// Count unread messages in a folder.
+pub async fn count_unread(
+    db: &DatabaseConnection,
+    folder_id: Uuid,
+) -> Result<i64, AppError> {
+    let count = mail_messages::Entity::find()
+        .filter(mail_messages::Column::FolderId.eq(folder_id))
+        .filter(mail_messages::Column::IsRead.eq(false))
+        .count(db)
+        .await
+        .map_err(AppError::Database)?;
+    Ok(count as i64)
+}
+
+/// List all IMAP UIDs stored for a folder.
+pub async fn list_uids_in_folder(
+    db: &DatabaseConnection,
+    account_id: Uuid,
+    folder_id: Uuid,
+) -> Result<Vec<(Uuid, i32, bool)>, AppError> {
+    // Returns (message_id, imap_uid, is_read)
+    mail_messages::Entity::find()
+        .filter(mail_messages::Column::AccountId.eq(account_id))
+        .filter(mail_messages::Column::FolderId.eq(folder_id))
+        .select_only()
+        .column(mail_messages::Column::Id)
+        .column(mail_messages::Column::Uid)
+        .column(mail_messages::Column::IsRead)
+        .into_tuple::<(Uuid, i32, bool)>()
+        .all(db)
+        .await
+        .map_err(AppError::Database)
+}
+
+/// Batch update is_read by IMAP UIDs.
+pub async fn update_read_by_uids(
+    db: &DatabaseConnection,
+    account_id: Uuid,
+    folder_id: Uuid,
+    uids: &[i32],
+    is_read: bool,
+) -> Result<u64, AppError> {
+    if uids.is_empty() {
+        return Ok(0);
+    }
+    let result = mail_messages::Entity::update_many()
+        .filter(mail_messages::Column::AccountId.eq(account_id))
+        .filter(mail_messages::Column::FolderId.eq(folder_id))
+        .filter(mail_messages::Column::Uid.is_in(uids.iter().copied()))
+        .col_expr(mail_messages::Column::IsRead, Expr::value(is_read))
+        .exec(db)
+        .await
+        .map_err(AppError::Database)?;
+    Ok(result.rows_affected)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn create(
     db: &DatabaseConnection,

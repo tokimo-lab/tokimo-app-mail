@@ -57,6 +57,7 @@ pub async fn list_messages(
 }
 
 /// Get full message details from database.
+/// Fire-and-forget marks message as seen on IMAP server.
 pub async fn get_message(
     db: &DatabaseConnection,
     user_id: Uuid,
@@ -67,13 +68,27 @@ pub async fn get_message(
         .ok_or_else(|| AppError::NotFound("Message not found".into()))?;
 
     // Verify ownership via account.
-    repos::accounts::find_by_id_and_user(db, msg.account_id, user_id)
+    let account = repos::accounts::find_by_id_and_user(db, msg.account_id, user_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Message not found".into()))?;
 
     // Mark as read if not already.
     if !msg.is_read {
         repos::messages::update_read_status(db, &[message_id], true).await?;
+        refresh_folder_unread_count(db, msg.folder_id).await?;
+
+        // Fire-and-forget: mark seen on IMAP server.
+        let folder = repos::folders::find_by_id(db, msg.folder_id).await?;
+        if let Some(folder) = folder {
+            let cfg = account_to_config(&account);
+            let uid = msg.uid as u32;
+            tokio::spawn(async move {
+                let client = tokimo_mail::MailClient::new(cfg);
+                if let Err(e) = client.mark_read(&folder.name, &[uid]).await {
+                    tracing::warn!("Failed to mark UID {uid} as seen on IMAP: {e}");
+                }
+            });
+        }
     }
 
     let attachments = repos::messages::list_attachments(db, message_id).await?;
@@ -127,24 +142,31 @@ pub async fn get_message(
 }
 
 /// Mark messages as read.
+/// Fire-and-forget updates IMAP \Seen flag.
 pub async fn mark_read(
     db: &DatabaseConnection,
-    _user_id: Uuid,
+    user_id: Uuid,
     message_ids: &[String],
 ) -> Result<(), AppError> {
     let uuids = parse_uuids(message_ids)?;
-    // TODO: Also update IMAP flags via tokimo_mail
-    repos::messages::update_read_status(db, &uuids, true).await
+    repos::messages::update_read_status(db, &uuids, true).await?;
+    refresh_folder_unread_counts_for_messages(db, &uuids).await?;
+    spawn_imap_flag_update(db, user_id, &uuids, true).await;
+    Ok(())
 }
 
 /// Mark messages as unread.
+/// Fire-and-forget updates IMAP \Seen flag.
 pub async fn mark_unread(
     db: &DatabaseConnection,
-    _user_id: Uuid,
+    user_id: Uuid,
     message_ids: &[String],
 ) -> Result<(), AppError> {
     let uuids = parse_uuids(message_ids)?;
-    repos::messages::update_read_status(db, &uuids, false).await
+    repos::messages::update_read_status(db, &uuids, false).await?;
+    refresh_folder_unread_counts_for_messages(db, &uuids).await?;
+    spawn_imap_flag_update(db, user_id, &uuids, false).await;
+    Ok(())
 }
 
 /// Delete messages (from database; TODO: also from IMAP server).
@@ -242,6 +264,80 @@ pub async fn search_messages(
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/// Recompute and persist unread_count for a single folder.
+async fn refresh_folder_unread_count(
+    db: &DatabaseConnection,
+    folder_id: Uuid,
+) -> Result<(), AppError> {
+    let count = repos::messages::count_unread(db, folder_id).await?;
+    repos::folders::update_unread_count(db, folder_id, count as i32).await
+}
+
+/// Recompute unread_count for all folders that the given messages belong to.
+async fn refresh_folder_unread_counts_for_messages(
+    db: &DatabaseConnection,
+    message_ids: &[Uuid],
+) -> Result<(), AppError> {
+    let mut folder_ids = std::collections::HashSet::new();
+    for &id in message_ids {
+        if let Some(msg) = repos::messages::find_by_id(db, id).await? {
+            folder_ids.insert(msg.folder_id);
+        }
+    }
+    for fid in folder_ids {
+        refresh_folder_unread_count(db, fid).await?;
+    }
+    Ok(())
+}
+
+/// Fire-and-forget: update IMAP flags for a batch of messages.
+/// Groups messages by (account, folder), looks up configs, and spawns a task.
+async fn spawn_imap_flag_update(
+    db: &DatabaseConnection,
+    user_id: Uuid,
+    message_uuids: &[Uuid],
+    mark_read: bool,
+) {
+    // Collect (account_id, folder_id, uid) for each message.
+    let mut by_folder: std::collections::HashMap<(Uuid, Uuid), Vec<u32>> =
+        std::collections::HashMap::new();
+    for &msg_id in message_uuids {
+        if let Ok(Some(msg)) = repos::messages::find_by_id(db, msg_id).await {
+            by_folder
+                .entry((msg.account_id, msg.folder_id))
+                .or_default()
+                .push(msg.uid as u32);
+        }
+    }
+
+    for ((account_id, folder_id), uids) in by_folder {
+        let Ok(Some(account)) =
+            repos::accounts::find_by_id_and_user(db, account_id, user_id).await
+        else {
+            continue;
+        };
+        let Ok(Some(folder)) = repos::folders::find_by_id(db, folder_id).await else {
+            continue;
+        };
+        let cfg = account_to_config(&account);
+        tokio::spawn(async move {
+            let client = tokimo_mail::MailClient::new(cfg);
+            let result = if mark_read {
+                client.mark_read(&folder.name, &uids).await
+            } else {
+                client.mark_unread(&folder.name, &uids).await
+            };
+            if let Err(e) = result {
+                tracing::warn!(
+                    "Failed to update IMAP flags for {} UIDs in '{}': {e}",
+                    uids.len(),
+                    folder.name
+                );
+            }
+        });
+    }
+}
 
 fn parse_addrs(json: &serde_json::Value) -> Vec<MailAddressOutput> {
     serde_json::from_value::<Vec<MailAddressOutput>>(json.clone()).unwrap_or_default()

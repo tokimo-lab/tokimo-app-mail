@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::db::entities::{mail_accounts, mail_folders};
 use crate::error::AppError;
+use crate::queue::{AppEvent, AppEventSender};
 
 use super::super::repos;
 use super::accounts::account_to_config;
@@ -14,6 +15,7 @@ pub async fn sync_account(
     db: &DatabaseConnection,
     user_id: Uuid,
     account_id: Uuid,
+    event_tx: Option<&AppEventSender>,
 ) -> Result<(), AppError> {
     let account = repos::accounts::find_by_id_and_user(db, account_id, user_id)
         .await?
@@ -51,7 +53,7 @@ pub async fn sync_account(
 
     // 2. Sync messages for each folder.
     for folder in &db_folders {
-        if let Err(e) = sync_folder_messages(db, &cfg, account_id, folder).await {
+        if let Err(e) = sync_folder_messages(db, &cfg, account_id, folder, event_tx).await {
             warn!(
                 "Failed to sync folder '{}' for {}: {e}",
                 folder.name, account.email
@@ -81,6 +83,7 @@ async fn sync_folder_messages(
     cfg: &tokimo_mail::MailAccountConfig,
     account_id: Uuid,
     folder: &mail_folders::Model,
+    event_tx: Option<&AppEventSender>,
 ) -> Result<(), AppError> {
     let client = tokimo_mail::MailClient::new(cfg.clone());
 
@@ -155,9 +158,28 @@ async fn sync_folder_messages(
         }
     }
 
-    // ── Update folder counts ─────────────────────────────────────────────
+    // ── Phase 4: Flag sync — reconcile read/flagged state ────────────────
+    match sync_flags(db, &client, account_id, folder).await {
+        Ok((read_uids, unread_uids)) => {
+            if (!read_uids.is_empty() || !unread_uids.is_empty())
+                && let Some(tx) = event_tx
+            {
+                let _ = tx.send(AppEvent::MailFlagsSynced {
+                    account_id: account_id.to_string(),
+                    folder_id: folder.id.to_string(),
+                    read_uids,
+                    unread_uids,
+                });
+            }
+        }
+        Err(e) => warn!("Folder '{}': flag sync failed: {e}", folder.name),
+    }
+
+    // ── Update folder counts (DB-computed) ───────────────────────────────
+    let unread = repos::messages::count_unread(db, folder.id).await?;
     let mut active: mail_folders::ActiveModel = folder.clone().into();
     active.total_count = Set(total as i32);
+    active.unread_count = Set(unread as i32);
     active.updated_at = Set(Utc::now().fixed_offset());
     active.update(db).await?;
 
@@ -389,6 +411,85 @@ async fn update_history_cursor(
     active.updated_at = Set(Utc::now().fixed_offset());
     active.update(db).await.map_err(AppError::Database)?;
     Ok(())
+}
+
+/// Phase 4: Sync flags — fetch IMAP flags for existing messages, update DB
+/// where read/flagged state differs.
+const FLAGS_BATCH: usize = 500;
+
+/// Returns (read_uids, unread_uids) — the UIDs whose is_read state changed.
+async fn sync_flags(
+    db: &DatabaseConnection,
+    client: &tokimo_mail::MailClient,
+    account_id: Uuid,
+    folder: &mail_folders::Model,
+) -> Result<(Vec<i32>, Vec<i32>), AppError> {
+    // Get all local message UIDs + their is_read state.
+    let local_msgs = repos::messages::list_uids_in_folder(db, account_id, folder.id).await?;
+    if local_msgs.is_empty() {
+        return Ok((vec![], vec![]));
+    }
+
+    // Build UID set for IMAP FETCH FLAGS.
+    let all_uids: Vec<u32> = local_msgs.iter().map(|(_, uid, _)| *uid as u32).collect();
+
+    // Fetch in batches from IMAP.
+    let mut imap_flags: std::collections::HashMap<u32, bool> = std::collections::HashMap::new();
+    for chunk in all_uids.chunks(FLAGS_BATCH) {
+        let uid_set = chunk
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
+        match client.fetch_flags_batch(&folder.name, &uid_set).await {
+            Ok(batch) => {
+                for (uid, seen, _flagged) in batch {
+                    imap_flags.insert(uid, seen);
+                }
+            }
+            Err(e) => {
+                warn!(
+                    "Folder '{}': failed to fetch flags batch: {e}",
+                    folder.name
+                );
+            }
+        }
+    }
+
+    // Compare and batch-update.
+    let mut to_mark_read: Vec<i32> = Vec::new();
+    let mut to_mark_unread: Vec<i32> = Vec::new();
+
+    for (_msg_id, uid, local_is_read) in &local_msgs {
+        if let Some(&imap_seen) = imap_flags.get(&(*uid as u32)) {
+            if imap_seen && !local_is_read {
+                to_mark_read.push(*uid);
+            } else if !imap_seen && *local_is_read {
+                to_mark_unread.push(*uid);
+            }
+        }
+    }
+
+    if !to_mark_read.is_empty() {
+        debug!(
+            "Folder '{}': marking {} messages as read (IMAP→DB)",
+            folder.name,
+            to_mark_read.len()
+        );
+        repos::messages::update_read_by_uids(db, account_id, folder.id, &to_mark_read, true)
+            .await?;
+    }
+    if !to_mark_unread.is_empty() {
+        debug!(
+            "Folder '{}': marking {} messages as unread (IMAP→DB)",
+            folder.name,
+            to_mark_unread.len()
+        );
+        repos::messages::update_read_by_uids(db, account_id, folder.id, &to_mark_unread, false)
+            .await?;
+    }
+
+    Ok((to_mark_read, to_mark_unread))
 }
 
 fn detect_folder_type(name: &str, attributes: &[String]) -> String {
