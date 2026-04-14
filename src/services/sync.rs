@@ -133,6 +133,28 @@ async fn sync_folder_messages(
         warn!("History backfill failed for folder '{}': {e}", folder.name);
     }
 
+    // ── Phase 3: Reconcile — remove locally cached messages deleted on server ──
+    match client.list_all_uids(&folder.name).await {
+        Ok(server_uids) => {
+            let valid: Vec<i32> = server_uids.iter().map(|&u| u as i32).collect();
+            match repos::messages::delete_stale_uids(db, account_id, folder.id, &valid).await {
+                Ok(removed) if removed > 0 => {
+                    info!(
+                        "Folder '{}': removed {} stale messages not on server",
+                        folder.name, removed
+                    );
+                }
+                Err(e) => {
+                    warn!("Folder '{}': failed to reconcile stale messages: {e}", folder.name);
+                }
+                _ => {}
+            }
+        }
+        Err(e) => {
+            warn!("Folder '{}': could not list server UIDs for reconcile: {e}", folder.name);
+        }
+    }
+
     // ── Update folder counts ─────────────────────────────────────────────
     let mut active: mail_folders::ActiveModel = folder.clone().into();
     active.total_count = Set(total as i32);

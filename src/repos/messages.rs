@@ -184,6 +184,26 @@ pub async fn delete_many(db: &DatabaseConnection, ids: &[Uuid]) -> Result<(), Ap
     Ok(())
 }
 
+/// Delete messages in a folder whose IMAP UIDs are NOT in the given set.
+pub async fn delete_stale_uids(
+    db: &DatabaseConnection,
+    account_id: Uuid,
+    folder_id: Uuid,
+    valid_uids: &[i32],
+) -> Result<u64, AppError> {
+    if valid_uids.is_empty() {
+        return Ok(0);
+    }
+    let result = mail_messages::Entity::delete_many()
+        .filter(mail_messages::Column::AccountId.eq(account_id))
+        .filter(mail_messages::Column::FolderId.eq(folder_id))
+        .filter(mail_messages::Column::Uid.is_not_in(valid_uids.iter().copied()))
+        .exec(db)
+        .await
+        .map_err(AppError::Database)?;
+    Ok(result.rows_affected)
+}
+
 pub async fn move_to_folder(
     db: &DatabaseConnection,
     ids: &[Uuid],
