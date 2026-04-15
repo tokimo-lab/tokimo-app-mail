@@ -1,8 +1,8 @@
 import { Badge, cn, ScrollArea, Spin } from "@tokiomo/components";
 import {
   AlertCircle,
+  AlertTriangle,
   Archive,
-  Folder,
   Inbox,
   Pencil,
   Send,
@@ -12,8 +12,9 @@ import {
 import { useEffect, useRef } from "react";
 import { api } from "@/generated/rust-api";
 import type { MailFolderOutput } from "@/generated/rust-api/mail";
+import { MaterialFileIcon } from "@/shared/components/icons/MaterialFileIcon";
 
-const FOLDER_ICONS: Record<string, typeof Inbox> = {
+const SPECIAL_FOLDER_ICONS: Record<string, typeof Inbox> = {
   inbox: Inbox,
   sent: Send,
   drafts: Pencil,
@@ -23,14 +24,17 @@ const FOLDER_ICONS: Record<string, typeof Inbox> = {
   archive: Archive,
   starred: Star,
   flagged: Star,
+  important: AlertTriangle,
 };
 
-function getFolderIcon(folderType: string, folderName: string) {
+function getFolderIconElement(folderType: string, folderName: string) {
   const Icon =
-    FOLDER_ICONS[folderType] ??
-    FOLDER_ICONS[folderName.toLowerCase()] ??
-    Folder;
-  return Icon;
+    SPECIAL_FOLDER_ICONS[folderType] ??
+    SPECIAL_FOLDER_ICONS[folderName.toLowerCase()];
+  if (Icon) {
+    return <Icon className="size-4 shrink-0" />;
+  }
+  return <MaterialFileIcon name={folderName} isDirectory size={16} />;
 }
 
 interface MailFolderPanelProps {
@@ -83,7 +87,6 @@ export function MailFolderPanel({
       <ScrollArea className="flex-1">
         <div className="flex flex-col gap-0.5 p-1.5">
           {folders.map((folder) => {
-            const Icon = getFolderIcon(folder.folderType, folder.name);
             const isActive = selectedFolderId === folder.id;
             return (
               <button
@@ -97,12 +100,13 @@ export function MailFolderPanel({
                     : "text-fg-secondary hover:bg-black/[0.04] dark:hover:bg-white/[0.04]",
                 )}
               >
-                <Icon className="size-4 shrink-0" />
+                {getFolderIconElement(folder.folderType, folder.name)}
                 <span className="truncate">{folder.name}</span>
                 {folder.unreadCount > 0 && (
                   <Badge
                     count={folder.unreadCount}
                     size="small"
+                    overflowCount={Number.POSITIVE_INFINITY}
                     className="ml-auto"
                   />
                 )}

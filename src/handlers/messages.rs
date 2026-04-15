@@ -215,6 +215,23 @@ pub async fn delete_messages(
     Ok(ok(()))
 }
 
+/// POST /api/apps/mail/messages/:message_id/refetch-body
+pub async fn refetch_body(
+    State(state): State<Arc<AppState>>,
+    AuthUser(user): AuthUser,
+    Path(message_id): Path<String>,
+) -> Result<Json<ApiResponse<MailMessageFullOutput>>, AppError> {
+    let uid: Uuid = user
+        .user_id
+        .parse()
+        .map_err(|_| AppError::BadRequest("invalid user id".into()))?;
+    let mid: Uuid = message_id
+        .parse()
+        .map_err(|_| AppError::BadRequest("invalid message id".into()))?;
+    let msg = services::messages::refetch_body(&state.db, uid, mid).await?;
+    Ok(ok(msg))
+}
+
 /// POST /api/apps/mail/messages/move
 pub async fn move_messages(
     State(state): State<Arc<AppState>>,
@@ -254,7 +271,7 @@ pub async fn search_messages(
     AuthUser(user): AuthUser,
     Path(account_id): Path<String>,
     Query(q): Query<SearchQuery>,
-) -> Result<Json<ApiResponse<Vec<MailMessageSummaryOutput>>>, AppError> {
+) -> Result<Json<ApiResponse<MailMessageListOutput>>, AppError> {
     let uid: Uuid = user
         .user_id
         .parse()

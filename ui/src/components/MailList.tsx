@@ -4,10 +4,13 @@ import {
   Empty,
   ScrollArea,
   type ScrollAreaRef,
+  SearchInput,
   Spin,
+  Tooltip,
 } from "@tokiomo/components";
-import { Inbox, Paperclip, Star } from "lucide-react";
+import { Inbox, Paperclip, Star, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "@/generated/rust-api";
 import type {
   MailMessageListOutput,
@@ -23,6 +26,7 @@ interface MailListProps {
   folderId: string;
   selectedMessageId: string | null;
   onSelectMessage: (id: string) => void;
+  onDeleteMessage: (id: string) => void;
 }
 
 export function MailList({
@@ -30,19 +34,31 @@ export function MailList({
   folderId,
   selectedMessageId,
   onSelectMessage,
+  onDeleteMessage,
 }: MailListProps) {
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const [allMessages, setAllMessages] = useState<MailMessageSummaryOutput[]>(
     [],
   );
   const [hasMore, setHasMore] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInputValue, setSearchInputValue] = useState("");
+
+  // Debounce search input → update query after 300ms idle.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInputValue.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInputValue]);
   const prevFolderRef = useRef<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const scrollAreaRef = useRef<ScrollAreaRef | null>(null);
   const isFetchingRef = useRef(false);
   const hasMoreRef = useRef(true);
 
-  // Reset when folder changes.
+  // Reset when folder changes (also clear search).
   useEffect(() => {
     const key = `${accountId}/${folderId}`;
     if (key === prevFolderRef.current) return;
@@ -51,17 +67,25 @@ export function MailList({
     setAllMessages([]);
     setHasMore(true);
     hasMoreRef.current = true;
+    setSearchQuery("");
+    setSearchInputValue("");
   }, [accountId, folderId]);
 
   const { data, isFetching, isLoading } = api.mail.listMessages.useQuery(
     { accountId, folderId, page, pageSize: PAGE_SIZE },
     {
-      enabled: !!accountId && !!folderId,
+      enabled: !!accountId && !!folderId && !searchQuery,
       staleTime: Number.POSITIVE_INFINITY,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
     },
   );
+
+  const { data: searchData, isFetching: isSearchFetching } =
+    api.mail.searchMessages.useQuery(
+      { accountId, q: searchQuery },
+      { enabled: !!searchQuery },
+    );
 
   // Keep refs in sync so the scroll handler (stable closure) can access latest values.
   isFetchingRef.current = isFetching;
@@ -169,6 +193,32 @@ export function MailList({
     });
   }, [accountId, folderId, page, queryClient, ws]);
 
+  // Subscribe to mail:new_messages (IMAP IDLE push) to show new mail instantly.
+  useEffect(() => {
+    return ws.subscribe("mail:new_messages", (msg) => {
+      const data = msg.data as {
+        accountId: string;
+        folderId: string;
+        count: number;
+      };
+      if (data.accountId !== accountId || data.folderId !== folderId) return;
+      // Invalidate page 1 so the list refreshes with the new messages at top.
+      queryClient.invalidateQueries({
+        queryKey: api.mail.listMessages.queryKey({
+          accountId,
+          folderId,
+          page: 1,
+          pageSize: PAGE_SIZE,
+        }),
+      });
+      // Reset to page 1 to show the newest messages.
+      // Keep existing messages visible until fresh data arrives.
+      setPage(1);
+      setHasMore(true);
+      hasMoreRef.current = true;
+    });
+  }, [accountId, folderId, queryClient, ws]);
+
   const handleSelectMessage = useCallback(
     (id: string) => {
       // Update local list immediately (no re-render lag).
@@ -183,33 +233,110 @@ export function MailList({
     [markAsReadInCache, markReadMutation, onSelectMessage],
   );
 
-  const total = data?.total ?? 0;
+  const handleSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setSearchInputValue(e.target.value);
+    },
+    [],
+  );
 
-  if (isLoading && page === 1) {
+  const deleteMutation = api.mail.deleteMessages.useMutation();
+  const handleDelete = useCallback(
+    (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      // Remove from local list immediately.
+      setAllMessages((prev) => prev.filter((m) => m.id !== id));
+      // Deselect if this message is selected.
+      onDeleteMessage(id);
+      // Delete from DB.
+      deleteMutation.mutate(
+        { message_ids: [id] },
+        {
+          onSuccess: () => {
+            // Invalidate folder queries to update counts.
+            queryClient.invalidateQueries({
+              queryKey: api.mail.listFolders.queryKey({ accountId }),
+            });
+          },
+        },
+      );
+    },
+    [accountId, deleteMutation, onDeleteMessage, queryClient],
+  );
+
+  // Decide which messages to show.
+  const displayMessages = searchQuery
+    ? (searchData?.messages ?? [])
+    : allMessages;
+  const total = searchQuery ? (searchData?.total ?? 0) : (data?.total ?? 0);
+  const loading =
+    (isLoading && page === 1 && !searchQuery) ||
+    (isSearchFetching && !!searchQuery);
+
+  if (loading) {
     return (
-      <div className="flex h-full w-72 shrink-0 items-center justify-center border-r border-border-base">
-        <Spin className="size-5" />
+      <div className="flex h-full w-72 shrink-0 flex-col border-r border-border-base">
+        <div className="border-b border-border-base px-3 py-2">
+          <SearchInput
+            value={searchInputValue}
+            placeholder={t("mail.list.search")}
+            onChange={handleSearchChange}
+            className="w-full"
+            size="small"
+          />
+        </div>
+        <div className="flex flex-1 items-center justify-center">
+          <Spin className="size-5" />
+        </div>
       </div>
     );
   }
 
-  if (allMessages.length === 0 && !isFetching) {
+  if (displayMessages.length === 0 && !isFetching && !isSearchFetching) {
     return (
-      <div className="flex h-full w-72 shrink-0 items-center justify-center border-r border-border-base">
-        <Empty
-          image={<Inbox className="size-10 stroke-1" />}
-          description="No messages"
-        />
+      <div className="flex h-full w-72 shrink-0 flex-col border-r border-border-base">
+        <div className="border-b border-border-base px-3 py-2">
+          <SearchInput
+            value={searchInputValue}
+            placeholder={t("mail.list.search")}
+            onChange={handleSearchChange}
+            className="w-full"
+            size="small"
+          />
+        </div>
+        <div className="flex flex-1 items-center justify-center">
+          <Empty
+            image={<Inbox className="size-10 stroke-1" />}
+            description={
+              searchQuery
+                ? t("mail.list.noResults", { query: searchQuery })
+                : t("mail.list.noMessages")
+            }
+          />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex h-full w-72 shrink-0 flex-col border-r border-border-base">
-      {/* Header */}
+      {/* Search bar */}
       <div className="border-b border-border-base px-3 py-2">
-        <span className="text-sm font-medium text-fg-primary">
-          {total} messages
+        <SearchInput
+          value={searchInputValue}
+          placeholder={t("mail.list.search")}
+          onChange={handleSearchChange}
+          className="w-full"
+          size="small"
+        />
+      </div>
+
+      {/* Header */}
+      <div className="border-b border-border-base px-3 py-1.5">
+        <span className="text-xs text-fg-muted">
+          {searchQuery
+            ? t("mail.list.resultsCount", { count: total })
+            : t("mail.list.messagesCount", { count: total })}
         </span>
       </div>
 
@@ -220,12 +347,13 @@ export function MailList({
         onScrollChange={handleScrollChange}
       >
         <div className="divide-y divide-border-subtle">
-          {allMessages.map((msg) => (
+          {displayMessages.map((msg) => (
             <MessageRow
               key={msg.id}
               message={msg}
               isSelected={selectedMessageId === msg.id}
               onClick={() => handleSelectMessage(msg.id)}
+              onDelete={(e) => handleDelete(e, msg.id)}
             />
           ))}
         </div>
@@ -245,16 +373,19 @@ function MessageRow({
   message,
   isSelected,
   onClick,
+  onDelete,
 }: {
   message: MailMessageSummaryOutput;
   isSelected: boolean;
   onClick: () => void;
+  onDelete: (e: React.MouseEvent) => void;
 }) {
+  const { t } = useTranslation();
   const isUnread = !message.isRead;
   const fromDisplay =
     message.from.length > 0
       ? message.from[0].name || message.from[0].address
-      : "Unknown";
+      : t("mail.list.unknownSender");
 
   const dateStr = message.date
     ? formatRelativeDate(new Date(message.date))
@@ -264,17 +395,15 @@ function MessageRow({
     <button
       type="button"
       className={cn(
-        "flex w-full cursor-pointer flex-col gap-0.5 overflow-hidden px-3 py-2 text-left transition-colors",
-        isSelected
-          ? "bg-[var(--accent)]/40"
-          : "hover:bg-black/[0.04] dark:hover:bg-white/[0.04]",
+        "group/msg flex w-full cursor-pointer flex-col gap-0.5 overflow-hidden px-3 py-2 text-left transition-colors",
+        isSelected ? "bg-accent/10" : "hover:bg-fill-tertiary",
         !isSelected && isUnread && "bg-fill-tertiary",
       )}
       onClick={onClick}
     >
       <div className="flex items-center gap-2">
         {isUnread && !isSelected && (
-          <span className="size-2 shrink-0 rounded-full bg-[var(--accent)]" />
+          <span className="size-2 shrink-0 rounded-full bg-accent" />
         )}
         <span
           className={cn(
@@ -286,9 +415,18 @@ function MessageRow({
         >
           {fromDisplay}
         </span>
-        <span className="ml-auto shrink-0 text-xs text-fg-muted">
+        <span className="ml-auto shrink-0 text-xs text-fg-muted group-hover/msg:hidden">
           {dateStr}
         </span>
+        <Tooltip title={t("mail.viewer.delete")}>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="ml-auto hidden shrink-0 cursor-pointer rounded p-0.5 text-fg-muted hover:text-red-500 group-hover/msg:inline-flex"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        </Tooltip>
       </div>
       <div className="flex items-center gap-1">
         <span
@@ -299,7 +437,7 @@ function MessageRow({
               : "text-fg-muted",
           )}
         >
-          {message.subject || "(no subject)"}
+          {message.subject || t("mail.list.noSubject")}
         </span>
         {message.isFlagged && (
           <Star className="size-3 shrink-0 fill-yellow-400 text-yellow-400" />

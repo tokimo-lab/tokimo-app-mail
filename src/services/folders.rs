@@ -70,10 +70,16 @@ pub async fn sync_folders(
 }
 
 fn model_to_output(m: mail_folders::Model) -> MailFolderOutput {
+    let decoded = tokimo_mail::decode_mailbox_name(&m.name);
+    // Strip provider prefixes like "[Gmail]/" for display.
+    let display = match m.delimiter.as_deref() {
+        Some(d) => decoded.rsplit_once(d).map_or(decoded.as_str(), |(_, b)| b),
+        None => decoded.rsplit_once('/').map_or(decoded.as_str(), |(_, b)| b),
+    };
     MailFolderOutput {
         id: m.id.to_string(),
         account_id: m.account_id.to_string(),
-        name: m.name,
+        name: display.to_string(),
         delimiter: m.delimiter,
         folder_type: m.folder_type,
         total_count: m.total_count,
@@ -83,28 +89,70 @@ fn model_to_output(m: mail_folders::Model) -> MailFolderOutput {
 }
 
 /// Detect folder type from IMAP name and attributes.
-fn detect_folder_type(name: &str, attributes: &[String]) -> String {
-    let lower = name.to_lowercase();
+fn detect_folder_type(raw_name: &str, attributes: &[String]) -> String {
+    let decoded = tokimo_mail::decode_mailbox_name(raw_name);
+    // Strip common prefixes like "[Gmail]/" for keyword matching.
+    let base = decoded
+        .rsplit_once('/')
+        .map_or(decoded.as_str(), |(_, b)| b);
+    let lower = base.to_lowercase();
     let attr_str = attributes.join(" ").to_lowercase();
 
     // Check IMAP special-use attributes first.
     if attr_str.contains("\\inbox") || lower == "inbox" {
         return "inbox".into();
     }
-    if attr_str.contains("\\sent") || lower.contains("sent") {
+    if attr_str.contains("\\sent")
+        || lower.contains("sent")
+        || base.contains("已发送")
+        || base.contains("送信済み")
+    {
         return "sent".into();
     }
-    if attr_str.contains("\\drafts") || lower.contains("draft") {
+    if attr_str.contains("\\drafts")
+        || lower.contains("draft")
+        || base.contains("草稿")
+        || base.contains("下書き")
+    {
         return "drafts".into();
     }
-    if attr_str.contains("\\trash") || lower.contains("trash") || lower.contains("deleted") {
+    if attr_str.contains("\\trash")
+        || lower.contains("trash")
+        || lower.contains("deleted")
+        || base.contains("废纸篓")
+        || base.contains("已删除")
+        || base.contains("ゴミ箱")
+    {
         return "trash".into();
     }
-    if attr_str.contains("\\junk") || lower.contains("junk") || lower.contains("spam") {
+    if attr_str.contains("\\junk")
+        || lower.contains("junk")
+        || lower.contains("spam")
+        || base.contains("垃圾")
+        || base.contains("迷惑メール")
+    {
         return "junk".into();
     }
-    if attr_str.contains("\\archive") || lower.contains("archive") || lower.contains("all mail") {
+    if attr_str.contains("\\all")
+        || attr_str.contains("\\archive")
+        || lower.contains("archive")
+        || lower.contains("all mail")
+        || base.contains("所有邮件")
+        || base.contains("すべてのメール")
+    {
         return "archive".into();
+    }
+    if attr_str.contains("\\flagged")
+        || lower.contains("starred")
+        || lower.contains("flagged")
+        || base.contains("已加星标")
+        || base.contains("星标")
+        || base.contains("スター付き")
+    {
+        return "starred".into();
+    }
+    if attr_str.contains("\\important") || lower.contains("important") || base.contains("重要") {
+        return "important".into();
     }
     "custom".into()
 }

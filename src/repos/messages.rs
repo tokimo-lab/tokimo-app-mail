@@ -224,6 +224,7 @@ pub async fn create(
         is_flagged: Set(is_flagged),
         has_attachments: Set(has_attachments),
         size: Set(size),
+        body_fetched: Set(true),
         created_at: Set(now),
     };
     mail_messages::Entity::insert(model)
@@ -255,6 +256,20 @@ pub async fn delete_many(db: &DatabaseConnection, ids: &[Uuid]) -> Result<(), Ap
     }
     mail_messages::Entity::delete_many()
         .filter(mail_messages::Column::Id.is_in(ids.iter().copied()))
+        .exec(db)
+        .await
+        .map_err(AppError::Database)?;
+    Ok(())
+}
+
+/// Reset body_fetched to false so the on-demand fetcher will re-download the body.
+pub async fn reset_body_fetched(db: &DatabaseConnection, id: Uuid) -> Result<(), AppError> {
+    mail_messages::Entity::update_many()
+        .filter(mail_messages::Column::Id.eq(id))
+        .col_expr(mail_messages::Column::BodyFetched, Expr::value(false))
+        .col_expr(mail_messages::Column::TextBody, Expr::value(Option::<String>::None))
+        .col_expr(mail_messages::Column::HtmlBody, Expr::value(Option::<String>::None))
+        .col_expr(mail_messages::Column::Preview, Expr::value(String::new()))
         .exec(db)
         .await
         .map_err(AppError::Database)?;
@@ -351,4 +366,118 @@ pub async fn create_attachment(
         .exec_with_returning(db)
         .await
         .map_err(AppError::Database)
+}
+
+/// Store a message summary (headers only, no body). body_fetched = false.
+/// Used during fast sync backfill; body will be fetched later by the background worker.
+pub async fn create_from_summary(
+    db: &DatabaseConnection,
+    account_id: Uuid,
+    folder_id: Uuid,
+    s: &tokimo_mail::MailMessageSummary,
+) -> Result<(), AppError> {
+    let id = Uuid::new_v4();
+    let now = chrono::Utc::now().fixed_offset();
+    let is_read = s.flags.iter().any(|f| f == "\\Seen");
+    let is_flagged = s.flags.iter().any(|f| f == "\\Flagged");
+    let from_json = serde_json::to_value(&s.from).unwrap_or_default();
+    let to_json = serde_json::to_value(&s.to).unwrap_or_default();
+    let flags_json = serde_json::to_value(&s.flags).unwrap_or_default();
+
+    let model = mail_messages::ActiveModel {
+        id: Set(id),
+        account_id: Set(account_id),
+        folder_id: Set(folder_id),
+        uid: Set(s.uid as i32),
+        message_id: Set(s.message_id.clone()),
+        subject: Set(s.subject.clone()),
+        from_addrs: Set(from_json),
+        to_addrs: Set(to_json),
+        cc_addrs: Set(None),
+        bcc_addrs: Set(None),
+        reply_to_addrs: Set(None),
+        in_reply_to: Set(None),
+        refs: Set(None),
+        date: Set(s.date),
+        text_body: Set(None),
+        html_body: Set(None),
+        preview: Set(String::new()),
+        flags: Set(flags_json),
+        is_read: Set(is_read),
+        is_flagged: Set(is_flagged),
+        has_attachments: Set(s.has_attachments),
+        size: Set(s.size as i32),
+        body_fetched: Set(false),
+        created_at: Set(now),
+    };
+    mail_messages::Entity::insert(model)
+        .exec(db)
+        .await
+        .map_err(AppError::Database)?;
+    Ok(())
+}
+
+/// Update a message's body content and mark it as fully fetched.
+/// Called by the background body-fetch worker.
+#[allow(clippy::too_many_arguments)]
+pub async fn update_body(
+    db: &DatabaseConnection,
+    id: Uuid,
+    text_body: Option<&str>,
+    html_body: Option<&str>,
+    preview: &str,
+    cc_addrs: Option<serde_json::Value>,
+    bcc_addrs: Option<serde_json::Value>,
+    reply_to_addrs: Option<serde_json::Value>,
+    in_reply_to: Option<String>,
+    refs: Option<String>,
+) -> Result<(), AppError> {
+    mail_messages::Entity::update_many()
+        .filter(mail_messages::Column::Id.eq(id))
+        .col_expr(
+            mail_messages::Column::TextBody,
+            Expr::value(text_body.map(ToString::to_string)),
+        )
+        .col_expr(
+            mail_messages::Column::HtmlBody,
+            Expr::value(html_body.map(ToString::to_string)),
+        )
+        .col_expr(mail_messages::Column::Preview, Expr::value(preview.to_string()))
+        .col_expr(mail_messages::Column::CcAddrs, Expr::value(cc_addrs))
+        .col_expr(mail_messages::Column::BccAddrs, Expr::value(bcc_addrs))
+        .col_expr(mail_messages::Column::ReplyToAddrs, Expr::value(reply_to_addrs))
+        .col_expr(mail_messages::Column::InReplyTo, Expr::value(in_reply_to))
+        .col_expr(mail_messages::Column::Refs, Expr::value(refs))
+        .col_expr(mail_messages::Column::BodyFetched, Expr::value(true))
+        .exec(db)
+        .await
+        .map_err(AppError::Database)?;
+    Ok(())
+}
+
+/// Find messages that need body fetching.
+/// Returns messages with body_fetched=false AND no body content.
+/// Returns Vec<(message_id, folder_id, uid, account_id)>.
+pub async fn list_unfetched(
+    db: &DatabaseConnection,
+    limit: u64,
+) -> Result<Vec<(Uuid, Uuid, i32, Uuid)>, AppError> {
+    let rows = mail_messages::Entity::find()
+        .filter(mail_messages::Column::BodyFetched.eq(false))
+        .filter(mail_messages::Column::TextBody.is_null())
+        .filter(mail_messages::Column::HtmlBody.is_null())
+        .order_by_desc(mail_messages::Column::Uid)
+        .limit(limit)
+        .select_only()
+        .columns([
+            mail_messages::Column::Id,
+            mail_messages::Column::FolderId,
+            mail_messages::Column::Uid,
+            mail_messages::Column::AccountId,
+        ])
+        .into_tuple::<(Uuid, Uuid, i32, Uuid)>()
+        .all(db)
+        .await
+        .map_err(AppError::Database)?;
+    Ok(rows)
 }

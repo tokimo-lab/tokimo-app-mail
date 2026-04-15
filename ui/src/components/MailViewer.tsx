@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { Button, Empty, ScrollArea, Spin, Tooltip } from "@tokiomo/components";
 import DOMPurify from "dompurify";
 import {
@@ -6,10 +7,11 @@ import {
   Forward,
   Mail,
   Paperclip,
+  RefreshCw,
   Reply,
-  Trash2,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "@/generated/rust-api";
 import type {
   MailAddressOutput,
@@ -24,6 +26,8 @@ interface MailViewerProps {
 }
 
 export function MailViewer({ messageId, onReply, onClose }: MailViewerProps) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const shadowHostRef = useRef<HTMLDivElement>(null);
   const { formatLong } = useDateFormat();
 
@@ -34,8 +38,13 @@ export function MailViewer({ messageId, onReply, onClose }: MailViewerProps) {
   const message = data as MailMessageFullOutput | undefined;
 
   const { mutate: markReadMutate } = api.mail.markRead.useMutation();
-  const deleteMessages = api.mail.deleteMessages.useMutation({
-    onSuccess: () => onClose(),
+  const refetchBody = api.mail.refetchBody.useMutation({
+    onSuccess: () => {
+      // Invalidate the message query to re-render with new body.
+      queryClient.invalidateQueries({
+        queryKey: api.mail.getMessage.queryKey({ messageId }),
+      });
+    },
   });
 
   // Auto-mark as read when loaded.
@@ -70,7 +79,7 @@ export function MailViewer({ messageId, onReply, onClose }: MailViewerProps) {
       <div className="flex min-w-0 flex-1 items-center justify-center">
         <Empty
           image={<Mail className="size-10 stroke-1" />}
-          description="Message not found"
+          description={t("mail.viewer.messageNotFound")}
         />
       </div>
     );
@@ -80,7 +89,7 @@ export function MailViewer({ messageId, onReply, onClose }: MailViewerProps) {
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
       {/* Toolbar */}
       <div className="flex shrink-0 items-center gap-1 border-b border-border-base px-3 py-2">
-        <Tooltip title="Back">
+        <Tooltip title={t("mail.viewer.back")}>
           <Button
             variant="text"
             size="small"
@@ -90,7 +99,7 @@ export function MailViewer({ messageId, onReply, onClose }: MailViewerProps) {
             <ArrowLeft className="size-4" />
           </Button>
         </Tooltip>
-        <Tooltip title="Reply">
+        <Tooltip title={t("mail.viewer.reply")}>
           <Button
             variant="text"
             size="small"
@@ -98,10 +107,10 @@ export function MailViewer({ messageId, onReply, onClose }: MailViewerProps) {
             onClick={() => onReply(message.id)}
           >
             <Reply className="size-4" />
-            <span className="ml-1">Reply</span>
+            <span className="ml-1">{t("mail.viewer.reply")}</span>
           </Button>
         </Tooltip>
-        <Tooltip title="Forward">
+        <Tooltip title={t("mail.viewer.forward")}>
           <Button
             variant="text"
             size="small"
@@ -109,46 +118,42 @@ export function MailViewer({ messageId, onReply, onClose }: MailViewerProps) {
             onClick={() => onReply(message.id)}
           >
             <Forward className="size-4" />
-            <span className="ml-1">Forward</span>
+            <span className="ml-1">{t("mail.viewer.forward")}</span>
           </Button>
         </Tooltip>
         <div className="flex-1" />
-        <Tooltip title="Delete">
-          <Button
-            variant="text"
-            size="small"
-            className="cursor-pointer text-red-500"
-            onClick={() => deleteMessages.mutate({ message_ids: [message.id] })}
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        </Tooltip>
       </div>
 
       <ScrollArea className="shrink-0 max-h-[45%]" direction="vertical">
         <div className="p-4">
           {/* Subject */}
           <h2 className="text-lg font-semibold text-fg-primary">
-            {message.subject || "(no subject)"}
+            {message.subject || t("mail.viewer.noSubject")}
           </h2>
 
           {/* From / To / Date */}
           <div className="mt-3 space-y-1 text-sm">
             <div className="flex gap-2">
-              <span className="shrink-0 text-fg-muted">From:</span>
+              <span className="shrink-0 text-fg-muted">
+                {t("mail.viewer.from")}
+              </span>
               <span className="min-w-0 break-all text-fg-primary">
                 {formatAddresses(message.from)}
               </span>
             </div>
             <div className="flex gap-2">
-              <span className="shrink-0 text-fg-muted">To:</span>
+              <span className="shrink-0 text-fg-muted">
+                {t("mail.viewer.to")}
+              </span>
               <span className="min-w-0 break-all text-fg-primary">
                 {formatAddresses(message.to)}
               </span>
             </div>
             {message.cc.length > 0 && (
               <div className="flex gap-2">
-                <span className="shrink-0 text-fg-muted">Cc:</span>
+                <span className="shrink-0 text-fg-muted">
+                  {t("mail.viewer.cc")}
+                </span>
                 <span className="min-w-0 break-all text-fg-primary">
                   {formatAddresses(message.cc)}
                 </span>
@@ -156,7 +161,9 @@ export function MailViewer({ messageId, onReply, onClose }: MailViewerProps) {
             )}
             {message.date && (
               <div className="flex gap-2">
-                <span className="shrink-0 text-fg-muted">Date:</span>
+                <span className="shrink-0 text-fg-muted">
+                  {t("mail.viewer.date")}
+                </span>
                 <span className="text-fg-primary">
                   {formatLong(message.date)}
                 </span>
@@ -212,9 +219,24 @@ export function MailViewer({ messageId, onReply, onClose }: MailViewerProps) {
             </pre>
           </ScrollArea>
         ) : (
-          <p className="p-4 text-sm text-fg-muted italic">
-            No content available
-          </p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-3">
+            <Mail className="size-8 stroke-1 text-fg-muted" />
+            <p className="text-sm text-fg-muted">
+              {t("mail.viewer.noContent")}
+            </p>
+            <Button
+              variant="default"
+              size="small"
+              className="cursor-pointer"
+              onClick={() => refetchBody.mutate(message.id)}
+              disabled={refetchBody.isPending}
+            >
+              <RefreshCw
+                className={`size-3.5 ${refetchBody.isPending ? "animate-spin" : ""}`}
+              />
+              <span className="ml-1.5">{t("mail.viewer.retryFetch")}</span>
+            </Button>
+          </div>
         )}
       </div>
     </div>

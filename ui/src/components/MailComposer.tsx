@@ -2,13 +2,14 @@ import {
   Button,
   Form,
   Input,
-  Modal,
+  ScrollArea,
   Spin,
   TextArea,
   useForm,
 } from "@tokiomo/components";
 import { Send } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "@/generated/rust-api";
 import type { MailMessageFullOutput } from "@/generated/rust-api/mail";
 import { useMessage } from "@/system/notifications/useMessage";
@@ -25,6 +26,7 @@ export function MailComposer({
   onClose,
 }: MailComposerProps) {
   const msg = useMessage();
+  const { t } = useTranslation();
   const [form] = useForm();
   const [showCcBcc, setShowCcBcc] = useState(false);
 
@@ -52,11 +54,11 @@ export function MailComposer({
 
   const sendMutation = api.mail.sendMessage.useMutation({
     onSuccess: () => {
-      msg.success("Message sent");
+      msg.success(t("mail.composer.messageSent"));
       onClose();
     },
     onError: (err) => {
-      msg.error(`Failed to send: ${err.message}`);
+      msg.error(t("mail.composer.sendFailed", { error: err.message }));
     },
   });
 
@@ -67,7 +69,7 @@ export function MailComposer({
       .map((s: string) => s.trim())
       .filter(Boolean);
     if (toAddrs.length === 0) {
-      msg.error("Please enter at least one recipient");
+      msg.error(t("mail.composer.recipientRequired"));
       return;
     }
 
@@ -93,71 +95,75 @@ export function MailComposer({
   };
 
   return (
-    <Modal
-      open
-      title={isReply ? "Reply" : "New Message"}
-      onCancel={onClose}
-      width={700}
-      footer={
-        <div className="flex items-center gap-2">
-          <Button
-            className="cursor-pointer"
-            onClick={handleSend}
-            disabled={sendMutation.isPending}
-          >
-            {sendMutation.isPending ? (
-              <Spin className="mr-2 size-4" />
-            ) : (
-              <Send className="mr-2 size-4" />
+    <div className="flex h-full flex-col">
+      <ScrollArea className="flex-1" direction="vertical">
+        <div className="p-4">
+          <Form form={form} layout="horizontal" labelCol={{ span: 1 }}>
+            <div className="flex items-center gap-2">
+              <Form.Item
+                label={t("mail.composer.to")}
+                name="to"
+                className="min-w-0 flex-1"
+                rules={[
+                  {
+                    required: true,
+                    message: t("mail.composer.recipientRequired"),
+                  },
+                ]}
+              >
+                <Input placeholder={t("mail.composer.toPlaceholder")} />
+              </Form.Item>
+              {!showCcBcc && (
+                <button
+                  type="button"
+                  className="mb-5 cursor-pointer text-xs text-fg-muted hover:text-fg-primary"
+                  onClick={() => setShowCcBcc(true)}
+                >
+                  Cc/Bcc
+                </button>
+              )}
+            </div>
+
+            {showCcBcc && (
+              <>
+                <Form.Item label={t("mail.composer.cc")} name="cc">
+                  <Input placeholder={t("mail.composer.ccPlaceholder")} />
+                </Form.Item>
+                <Form.Item label={t("mail.composer.bcc")} name="bcc">
+                  <Input placeholder={t("mail.composer.bccPlaceholder")} />
+                </Form.Item>
+              </>
             )}
-            Send
-          </Button>
+
+            <Form.Item label={t("mail.composer.subject")} name="subject">
+              <Input placeholder={t("mail.composer.subjectPlaceholder")} />
+            </Form.Item>
+
+            <Form.Item name="body" className="!mb-0">
+              <TextArea
+                placeholder={t("mail.composer.bodyPlaceholder")}
+                className="min-h-[300px] resize-none"
+              />
+            </Form.Item>
+          </Form>
         </div>
-      }
-    >
-      <Form form={form} layout="horizontal" labelCol={{ span: 1 }}>
-        <div className="flex items-center gap-2">
-          <Form.Item
-            label="To"
-            name="to"
-            className="min-w-0 flex-1"
-            rules={[{ required: true, message: "Recipient is required" }]}
-          >
-            <Input placeholder="recipient@example.com" />
-          </Form.Item>
-          {!showCcBcc && (
-            <button
-              type="button"
-              className="mb-5 cursor-pointer text-xs text-fg-muted hover:text-fg-primary"
-              onClick={() => setShowCcBcc(true)}
-            >
-              Cc/Bcc
-            </button>
+      </ScrollArea>
+
+      {/* Footer */}
+      <div className="flex items-center gap-2 border-t border-border-base px-4 py-3">
+        <Button
+          className="cursor-pointer"
+          onClick={handleSend}
+          disabled={sendMutation.isPending}
+        >
+          {sendMutation.isPending ? (
+            <Spin className="mr-2 size-4" />
+          ) : (
+            <Send className="mr-2 size-4" />
           )}
-        </div>
-
-        {showCcBcc && (
-          <>
-            <Form.Item label="Cc" name="cc">
-              <Input placeholder="cc@example.com" />
-            </Form.Item>
-            <Form.Item label="Bcc" name="bcc">
-              <Input placeholder="bcc@example.com" />
-            </Form.Item>
-          </>
-        )}
-
-        <Form.Item label="Subject" name="subject">
-          <Input placeholder="Subject" />
-        </Form.Item>
-
-        <Form.Item name="body" className="!mb-0">
-          <TextArea
-            placeholder="Write your message..."
-            className="min-h-[300px] resize-none"
-          />
-        </Form.Item>
-      </Form>
-    </Modal>
+          {t("mail.composer.send")}
+        </Button>
+      </div>
+    </div>
   );
 }

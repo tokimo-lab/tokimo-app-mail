@@ -129,3 +129,16 @@ pub async fn delete_absent(
         .map_err(AppError::Database)?;
     Ok(())
 }
+
+/// Find the INBOX folder for an account (folder_type = "inbox").
+pub async fn find_inbox(
+    db: &DatabaseConnection,
+    account_id: Uuid,
+) -> Result<Option<mail_folders::Model>, AppError> {
+    mail_folders::Entity::find()
+        .filter(mail_folders::Column::AccountId.eq(account_id))
+        .filter(mail_folders::Column::FolderType.eq("inbox"))
+        .one(db)
+        .await
+        .map_err(AppError::Database)
+}

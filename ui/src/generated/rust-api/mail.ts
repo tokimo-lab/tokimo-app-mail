@@ -263,6 +263,11 @@ export const mailApi = {
   deleteMessages: createMutation<BulkMessageIdsInput, void>({
     path: "/api/apps/mail/messages/delete",
   }),
+  refetchBody: createPathMutation<string, MailMessageFullOutput>({
+    method: "POST",
+    pathFn: (id) =>
+      `/api/apps/mail/messages/${encodeURIComponent(id)}/refetch-body`,
+  }),
   moveMessages: createMutation<MoveMessagesInput, void>({
     path: "/api/apps/mail/messages/move",
   }),

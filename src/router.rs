@@ -54,6 +54,10 @@ pub fn build_mail_app_routes() -> Router<Arc<AppState>> {
             get(handlers::messages::get_message),
         )
         .route(
+            "/api/apps/mail/messages/{message_id}/refetch-body",
+            post(handlers::messages::refetch_body),
+        )
+        .route(
             "/api/apps/mail/messages/read",
             post(handlers::messages::mark_read),
         )

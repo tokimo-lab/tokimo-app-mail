@@ -57,6 +57,8 @@ pub async fn list_messages(
 }
 
 /// Get full message details from database.
+/// If the message body has not been fetched yet (body_fetched=false),
+/// fetches it from IMAP in real-time and persists before returning.
 /// Fire-and-forget marks message as seen on IMAP server.
 pub async fn get_message(
     db: &DatabaseConnection,
@@ -71,6 +73,30 @@ pub async fn get_message(
     let account = repos::accounts::find_by_id_and_user(db, msg.account_id, user_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Message not found".into()))?;
+
+    // On-demand body fetch: if background worker hasn't fetched this yet, do it now.
+    let msg = if msg.body_fetched {
+        msg
+    } else {
+        let cfg = account_to_config(&account);
+        let folder = repos::folders::find_by_id(db, msg.folder_id).await?;
+        if let Some(ref folder) = folder {
+            match fetch_message_body_now(db, &cfg, &folder.name, message_id, msg.uid as u32).await {
+                Ok(()) => {
+                    // Re-read from DB to get the freshly stored body.
+                    repos::messages::find_by_id(db, message_id)
+                        .await?
+                        .ok_or_else(|| AppError::NotFound("Message not found".into()))?
+                }
+                Err(e) => {
+                    tracing::warn!("On-demand body fetch failed for {message_id}: {e}");
+                    msg
+                }
+            }
+        } else {
+            msg
+        }
+    };
 
     // Mark as read if not already.
     if !msg.is_read {
@@ -179,6 +205,19 @@ pub async fn delete_messages(
     repos::messages::delete_many(db, &uuids).await
 }
 
+/// Reset body_fetched flag and re-fetch the message body from IMAP.
+/// Returns the full message output with freshly fetched content.
+pub async fn refetch_body(
+    db: &DatabaseConnection,
+    user_id: Uuid,
+    message_id: Uuid,
+) -> Result<MailMessageFullOutput, AppError> {
+    // Reset so on-demand fetch will re-download.
+    repos::messages::reset_body_fetched(db, message_id).await?;
+    // Re-use get_message which already does on-demand body fetch.
+    get_message(db, user_id, message_id).await
+}
+
 /// Move messages to another folder (in database; TODO: also via IMAP).
 pub async fn move_messages(
     db: &DatabaseConnection,
@@ -233,37 +272,119 @@ pub async fn search_messages(
     user_id: Uuid,
     account_id: Uuid,
     query: &str,
-) -> Result<Vec<MailMessageSummaryOutput>, AppError> {
+) -> Result<MailMessageListOutput, AppError> {
     repos::accounts::find_by_id_and_user(db, account_id, user_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Account not found".into()))?;
 
     let messages = repos::messages::search(db, account_id, query).await?;
-    Ok(messages
-        .into_iter()
-        .map(|m| {
-            let from = parse_addrs(&m.from_addrs);
-            let to = parse_addrs(&m.to_addrs);
-            MailMessageSummaryOutput {
-                id: m.id.to_string(),
-                uid: m.uid,
-                message_id: m.message_id,
-                subject: m.subject,
-                from,
-                to,
-                date: m.date.map(|d| d.to_rfc3339()),
-                is_read: m.is_read,
-                is_flagged: m.is_flagged,
-                has_attachments: m.has_attachments,
-                preview: m.preview,
-                size: m.size,
-                folder_id: m.folder_id.to_string(),
-            }
-        })
-        .collect())
+    let total = messages.len() as i64;
+    Ok(MailMessageListOutput {
+        messages: messages
+            .into_iter()
+            .map(|m| {
+                let from = parse_addrs(&m.from_addrs);
+                let to = parse_addrs(&m.to_addrs);
+                MailMessageSummaryOutput {
+                    id: m.id.to_string(),
+                    uid: m.uid,
+                    message_id: m.message_id,
+                    subject: m.subject,
+                    from,
+                    to,
+                    date: m.date.map(|d| d.to_rfc3339()),
+                    is_read: m.is_read,
+                    is_flagged: m.is_flagged,
+                    has_attachments: m.has_attachments,
+                    preview: m.preview,
+                    size: m.size,
+                    folder_id: m.folder_id.to_string(),
+                }
+            })
+            .collect(),
+        total,
+    })
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/// Fetch a single message's body from IMAP and persist it to the database.
+/// Called when a user opens a message that hasn't been fetched by the background worker yet.
+async fn fetch_message_body_now(
+    db: &DatabaseConnection,
+    cfg: &tokimo_mail::MailAccountConfig,
+    folder_name: &str,
+    message_id: Uuid,
+    uid: u32,
+) -> Result<(), AppError> {
+    let mut session = tokimo_mail::MailSession::connect(cfg)
+        .await
+        .map_err(|e| AppError::Internal(format!("IMAP connect for on-demand fetch: {e}")))?;
+
+    session
+        .open_folder(folder_name)
+        .await
+        .map_err(|e| AppError::Internal(format!("IMAP SELECT '{folder_name}': {e}")))?;
+
+    let messages = session
+        .fetch_messages_batch(&uid.to_string())
+        .await
+        .map_err(|e| AppError::Internal(format!("IMAP FETCH UID {uid}: {e}")))?;
+
+    session.logout().await;
+
+    let Some(full_msg) = messages.into_iter().find(|m| m.uid == uid) else {
+        tracing::warn!("UID {uid} not found on IMAP server during on-demand fetch");
+        return Ok(());
+    };
+
+    let text_body = full_msg.text_body.as_deref().map(strip_null_bytes);
+    let html_body = full_msg.html_body.as_deref().map(strip_null_bytes);
+
+    let preview = text_body
+        .as_deref()
+        .unwrap_or_default()
+        .chars()
+        .take(200)
+        .collect::<String>();
+
+    let cc_json = serde_json::to_value(&full_msg.cc).ok();
+    let bcc_json = serde_json::to_value(&full_msg.bcc).ok();
+    let reply_to_json = serde_json::to_value(&full_msg.reply_to).ok();
+    let refs = if full_msg.references.is_empty() {
+        None
+    } else {
+        Some(full_msg.references.join(" "))
+    };
+
+    repos::messages::update_body(
+        db,
+        message_id,
+        text_body.as_deref(),
+        html_body.as_deref(),
+        &preview,
+        cc_json,
+        bcc_json,
+        reply_to_json,
+        full_msg.in_reply_to,
+        refs,
+    )
+    .await?;
+
+    for attachment in &full_msg.attachments {
+        repos::messages::create_attachment(
+            db,
+            message_id,
+            &attachment.filename,
+            &attachment.content_type,
+            attachment.size as i32,
+            attachment.data.as_deref(),
+        )
+        .await?;
+    }
+
+    Ok(())
+}
 
 /// Recompute and persist unread_count for a single folder.
 async fn refresh_folder_unread_count(
@@ -337,6 +458,11 @@ async fn spawn_imap_flag_update(
             }
         });
     }
+}
+
+/// Remove null bytes that PostgreSQL's UTF-8 encoding rejects.
+fn strip_null_bytes(s: &str) -> String {
+    s.replace('\0', "")
 }
 
 fn parse_addrs(json: &serde_json::Value) -> Vec<MailAddressOutput> {

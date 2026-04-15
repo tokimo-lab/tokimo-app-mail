@@ -16,6 +16,16 @@ pub async fn list_by_user(
         .map_err(AppError::Database)
 }
 
+pub async fn find_by_id(
+    db: &DatabaseConnection,
+    id: Uuid,
+) -> Result<Option<mail_accounts::Model>, AppError> {
+    mail_accounts::Entity::find_by_id(id)
+        .one(db)
+        .await
+        .map_err(AppError::Database)
+}
+
 pub async fn find_by_id_and_user(
     db: &DatabaseConnection,
     id: Uuid,

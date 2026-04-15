@@ -24,6 +24,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "@/generated/rust-api";
 import type { MailProviderPresetOutput } from "@/generated/rust-api/mail";
 import { useMessage } from "@/system/notifications/useMessage";
@@ -57,6 +58,7 @@ interface CredentialValues {
 type Step = "provider" | "credentials" | "test";
 
 export function AccountSetup({ onComplete, onCancel }: AccountSetupProps) {
+  const { t } = useTranslation();
   const [step, setStep] = useState<Step>("provider");
   const [selectedPreset, setSelectedPreset] =
     useState<MailProviderPresetOutput | null>(null);
@@ -94,7 +96,7 @@ export function AccountSetup({ onComplete, onCancel }: AccountSetupProps) {
     <div className="flex h-full items-center justify-center bg-surface-base">
       <div className="flex h-[550px] w-[600px] flex-col rounded-xl border border-border-base bg-surface-elevated shadow-lg">
         {/* Header */}
-        <div className="flex items-center gap-3 border-b border-black/[0.06] px-5 py-4 dark:border-white/[0.08]">
+        <div className="flex items-center gap-3 border-b border-border-base px-5 py-4">
           {step !== "provider" && (
             <button
               type="button"
@@ -106,12 +108,14 @@ export function AccountSetup({ onComplete, onCancel }: AccountSetupProps) {
           )}
           <Mail className="size-5 text-accent" />
           <h2 className="text-base font-semibold text-fg-primary">
-            {step === "provider" && "Add Email Account"}
+            {step === "provider" && t("mail.setup.addAccount")}
             {step === "credentials" &&
               (selectedPreset
-                ? `Set up ${selectedPreset.displayName}`
-                : "Manual Configuration")}
-            {step === "test" && "Testing Connection"}
+                ? t("mail.setup.setupProvider", {
+                    provider: selectedPreset.displayName,
+                  })
+                : t("mail.setup.manualConfig"))}
+            {step === "test" && t("mail.setup.testingConnection")}
           </h2>
           {onCancel && (
             <button
@@ -119,7 +123,7 @@ export function AccountSetup({ onComplete, onCancel }: AccountSetupProps) {
               className="ml-auto cursor-pointer text-sm text-fg-muted hover:text-fg-primary"
               onClick={onCancel}
             >
-              Cancel
+              {t("mail.setup.cancel")}
             </button>
           )}
         </div>
@@ -170,15 +174,16 @@ export function AccountSetup({ onComplete, onCancel }: AccountSetupProps) {
 // ── Steps indicator ──────────────────────────────────────────────────────────
 
 function StepIndicator({ current }: { current: Step }) {
+  const { t } = useTranslation();
   const steps: { key: Step; label: string }[] = [
-    { key: "provider", label: "Provider" },
-    { key: "credentials", label: "Credentials" },
-    { key: "test", label: "Connect" },
+    { key: "provider", label: t("mail.setup.provider") },
+    { key: "credentials", label: t("mail.setup.credentials") },
+    { key: "test", label: t("mail.setup.connect") },
   ];
   const currentIdx = steps.findIndex((s) => s.key === current);
 
   return (
-    <div className="flex items-center gap-2 border-b border-black/[0.06] px-5 py-2 dark:border-white/[0.08]">
+    <div className="flex items-center gap-2 border-b border-border-base px-5 py-2">
       {steps.map((s, i) => (
         <div key={s.key} className="flex items-center gap-2">
           {i > 0 && <ChevronRight className="size-3 text-fg-muted" />}
@@ -209,6 +214,7 @@ function ProviderStep({
   onSelectPreset: (p: MailProviderPresetOutput) => void;
   onSelectCustom: () => void;
 }) {
+  const { t } = useTranslation();
   const { data, isLoading } = api.mail.listProviders.useQuery({});
   const presets = (data ?? []) as MailProviderPresetOutput[];
 
@@ -252,9 +258,11 @@ function ProviderStep({
           <Globe className="size-5 shrink-0 text-fg-muted" />
           <div>
             <div className="text-sm font-medium text-fg-primary">
-              Other / Custom
+              {t("mail.setup.otherCustom")}
             </div>
-            <div className="text-xs text-fg-muted">Manual IMAP/SMTP</div>
+            <div className="text-xs text-fg-muted">
+              {t("mail.setup.manualImapSmtp")}
+            </div>
           </div>
           <ChevronRight className="ml-auto size-4 shrink-0 text-fg-muted" />
         </button>
@@ -276,6 +284,7 @@ function CredentialStep({
   isCustom: boolean;
   onNext: () => void;
 }) {
+  const { t } = useTranslation();
   const useSeparateSmtp = Form.useWatch<boolean>("useSeparateSmtp", form);
 
   const handleNext = async () => {
@@ -297,12 +306,12 @@ function CredentialStep({
       >
         {/* Setup instructions */}
         {preset && preset.setupInstructions?.length > 0 && (
-          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/30">
-            <div className="mb-2 flex items-center gap-1.5 text-sm font-medium text-blue-700 dark:text-blue-300">
+          <div className="rounded-md border border-accent/20 bg-accent/5 p-3">
+            <div className="mb-2 flex items-center gap-1.5 text-sm font-medium text-accent">
               <Shield className="size-4" />
-              Setup Instructions
+              {t("mail.setup.setupInstructions")}
             </div>
-            <ol className="ml-5 list-decimal space-y-1 text-sm text-blue-600 dark:text-blue-400">
+            <ol className="ml-5 list-decimal space-y-1 text-sm text-fg-secondary">
               {preset.setupInstructions.map((inst) => (
                 <li key={inst}>{inst}</li>
               ))}
@@ -312,39 +321,47 @@ function CredentialStep({
                 href={preset.appPasswordUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-2 inline-block text-sm text-blue-600 underline hover:text-blue-800 dark:text-blue-400"
+                className="mt-2 inline-block text-sm text-accent underline hover:text-accent-hover"
               >
-                Open {preset.displayName} app password page →
+                {t("mail.setup.openAppPasswordPage", {
+                  provider: preset.displayName,
+                })}
               </a>
             )}
           </div>
         )}
 
         <Form.Item
-          label="Email Address"
+          label={t("mail.setup.emailAddress")}
           name="email"
           rules={[
-            { required: true, message: "Email is required" },
-            { type: "email", message: "Invalid email address" },
+            { required: true, message: t("mail.setup.emailRequired") },
+            { type: "email", message: t("mail.setup.emailInvalid") },
           ]}
         >
-          <Input placeholder="you@example.com" />
+          <Input placeholder={t("mail.setup.emailPlaceholder")} />
         </Form.Item>
 
-        <Form.Item label="Display Name" name="displayName">
-          <Input placeholder="Your Name" />
+        <Form.Item label={t("mail.setup.displayName")} name="displayName">
+          <Input placeholder={t("mail.setup.displayNamePlaceholder")} />
         </Form.Item>
 
         <Form.Item
-          label={preset?.requiresAppPassword ? "App Password" : "Password"}
+          label={
+            preset?.requiresAppPassword
+              ? t("mail.setup.appPassword")
+              : t("mail.setup.password")
+          }
           name="password"
-          rules={[{ required: true, message: "Password is required" }]}
+          rules={[
+            { required: true, message: t("mail.setup.passwordRequired") },
+          ]}
         >
           <Password
             placeholder={
               preset?.requiresAppPassword
-                ? "Enter app-specific password"
-                : "Enter password"
+                ? t("mail.setup.appPasswordPlaceholder")
+                : t("mail.setup.passwordPlaceholder")
             }
           />
         </Form.Item>
@@ -354,7 +371,7 @@ function CredentialStep({
           <>
             <div className="border-t border-border-base pt-3">
               <h4 className="mb-2 text-sm font-medium text-fg-primary">
-                IMAP Settings
+                {t("mail.setup.imapSettings")}
               </h4>
               <div className="grid grid-cols-3 gap-2">
                 <div className="col-span-2">
@@ -373,7 +390,7 @@ function CredentialStep({
 
             <div className="border-t border-border-base pt-3">
               <h4 className="mb-2 text-sm font-medium text-fg-primary">
-                SMTP Settings
+                {t("mail.setup.smtpSettings")}
               </h4>
               <div className="grid grid-cols-3 gap-2">
                 <div className="col-span-2">
@@ -393,23 +410,23 @@ function CredentialStep({
         )}
 
         <Form.Item name="useSeparateSmtp" valuePropName="checked">
-          <Checkbox>Use different credentials for SMTP</Checkbox>
+          <Checkbox>{t("mail.setup.useSeparateSmtp")}</Checkbox>
         </Form.Item>
 
         {useSeparateSmtp && (
           <div className="space-y-1 pl-4">
-            <Form.Item label="SMTP Username" name="smtpUsername">
-              <Input placeholder="SMTP username" />
+            <Form.Item label={t("mail.setup.smtpUsername")} name="smtpUsername">
+              <Input placeholder={t("mail.setup.smtpUsernamePlaceholder")} />
             </Form.Item>
-            <Form.Item label="SMTP Password" name="smtpPassword">
-              <Password placeholder="SMTP password" />
+            <Form.Item label={t("mail.setup.smtpPassword")} name="smtpPassword">
+              <Password placeholder={t("mail.setup.smtpPasswordPlaceholder")} />
             </Form.Item>
           </div>
         )}
 
         <div className="flex justify-end pt-2">
           <Button className="cursor-pointer" onClick={handleNext}>
-            Test Connection
+            {t("mail.setup.testConnection")}
             <ArrowRight className="ml-2 size-4" />
           </Button>
         </div>
@@ -452,17 +469,18 @@ function TestStep({
   onBack: () => void;
 }) {
   const msg = useMessage();
+  const { t } = useTranslation();
   const qc = useQueryClient();
 
   const createAccount = api.mail.createAccount.useMutation({
     onSuccess: () => {
-      msg.success("Account added successfully!");
+      msg.success(t("mail.setup.accountAdded"));
       // Invalidate accounts list so sidebar picks it up.
       api.mail.listAccounts.invalidate(qc);
       onComplete();
     },
     onError: (err) => {
-      msg.error(`Failed to create account: ${err.message}`);
+      msg.error(t("mail.setup.createFailed", { error: err.message }));
     },
   });
 
@@ -490,19 +508,19 @@ function TestStep({
         <>
           <Spin className="size-8 text-accent" />
           <p className="text-sm text-fg-muted">
-            Creating account and testing connection...
+            {t("mail.setup.creatingAccount")}
           </p>
         </>
       )}
 
       {createAccount.isSuccess && (
         <>
-          <CheckCircle2 className="size-10 text-green-500" />
+          <CheckCircle2 className="size-10 text-accent" />
           <p className="text-sm font-medium text-fg-primary">
-            Account connected successfully!
+            {t("mail.setup.accountSuccess")}
           </p>
           <p className="text-sm text-fg-muted">
-            Your mailbox is being synced in the background.
+            {t("mail.setup.syncingBackground")}
           </p>
         </>
       )}
@@ -511,7 +529,7 @@ function TestStep({
         <>
           <XCircle className="size-10 text-red-500" />
           <p className="text-sm font-medium text-fg-primary">
-            Connection failed
+            {t("mail.setup.connectionFailed")}
           </p>
           <p className="max-w-md text-center text-sm text-fg-muted">
             {createAccount.error?.message || "Unknown error"}
@@ -523,10 +541,10 @@ function TestStep({
               onClick={onBack}
             >
               <ArrowLeft className="mr-2 size-4" />
-              Go back
+              {t("mail.setup.goBack")}
             </Button>
             <Button className="cursor-pointer" onClick={handleCreate}>
-              Retry
+              {t("mail.setup.retry")}
             </Button>
           </div>
         </>
@@ -536,7 +554,10 @@ function TestStep({
         <>
           <Mail className="size-10 text-accent" />
           <p className="text-sm text-fg-muted">
-            Ready to add <strong>{email}</strong>
+            {t("mail.setup.readyToAdd", {
+              email,
+              interpolation: { escapeValue: false },
+            })}
           </p>
           <div className="flex gap-2">
             <Button
@@ -545,11 +566,11 @@ function TestStep({
               onClick={onBack}
             >
               <ArrowLeft className="mr-2 size-4" />
-              Back
+              {t("mail.setup.back")}
             </Button>
             <Button className="cursor-pointer" onClick={handleCreate}>
               <Check className="mr-2 size-4" />
-              Add Account
+              {t("mail.setup.addAccountBtn")}
             </Button>
           </div>
         </>
