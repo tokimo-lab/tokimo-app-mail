@@ -70,10 +70,7 @@ pub async fn list_by_folder(
     Ok((messages, total))
 }
 
-pub async fn find_by_id(
-    db: &DatabaseConnection,
-    id: Uuid,
-) -> Result<Option<mail_messages::Model>, AppError> {
+pub async fn find_by_id(db: &DatabaseConnection, id: Uuid) -> Result<Option<mail_messages::Model>, AppError> {
     mail_messages::Entity::find_by_id(id)
         .one(db)
         .await
@@ -118,10 +115,7 @@ pub async fn existing_uids_in_folder(
 }
 
 /// Count unread messages in a folder.
-pub async fn count_unread(
-    db: &DatabaseConnection,
-    folder_id: Uuid,
-) -> Result<i64, AppError> {
+pub async fn count_unread(db: &DatabaseConnection, folder_id: Uuid) -> Result<i64, AppError> {
     let count = mail_messages::Entity::find()
         .filter(mail_messages::Column::FolderId.eq(folder_id))
         .filter(mail_messages::Column::IsRead.eq(false))
@@ -233,11 +227,7 @@ pub async fn create(
         .map_err(AppError::Database)
 }
 
-pub async fn update_read_status(
-    db: &DatabaseConnection,
-    ids: &[Uuid],
-    is_read: bool,
-) -> Result<(), AppError> {
+pub async fn update_read_status(db: &DatabaseConnection, ids: &[Uuid], is_read: bool) -> Result<(), AppError> {
     if ids.is_empty() {
         return Ok(());
     }
@@ -276,31 +266,9 @@ pub async fn reset_body_fetched(db: &DatabaseConnection, id: Uuid) -> Result<(),
     Ok(())
 }
 
-/// Delete messages in a folder whose IMAP UIDs are NOT in the given set.
-pub async fn delete_stale_uids(
-    db: &DatabaseConnection,
-    account_id: Uuid,
-    folder_id: Uuid,
-    valid_uids: &[i32],
-) -> Result<u64, AppError> {
-    if valid_uids.is_empty() {
-        return Ok(0);
-    }
-    let result = mail_messages::Entity::delete_many()
-        .filter(mail_messages::Column::AccountId.eq(account_id))
-        .filter(mail_messages::Column::FolderId.eq(folder_id))
-        .filter(mail_messages::Column::Uid.is_not_in(valid_uids.iter().copied()))
-        .exec(db)
-        .await
-        .map_err(AppError::Database)?;
-    Ok(result.rows_affected)
-}
 
-pub async fn move_to_folder(
-    db: &DatabaseConnection,
-    ids: &[Uuid],
-    folder_id: Uuid,
-) -> Result<(), AppError> {
+
+pub async fn move_to_folder(db: &DatabaseConnection, ids: &[Uuid], folder_id: Uuid) -> Result<(), AppError> {
     if ids.is_empty() {
         return Ok(());
     }
@@ -458,10 +426,7 @@ pub async fn update_body(
 /// Find messages that need body fetching.
 /// Returns messages with body_fetched=false AND no body content.
 /// Returns Vec<(message_id, folder_id, uid, account_id)>.
-pub async fn list_unfetched(
-    db: &DatabaseConnection,
-    limit: u64,
-) -> Result<Vec<(Uuid, Uuid, i32, Uuid)>, AppError> {
+pub async fn list_unfetched(db: &DatabaseConnection, limit: u64) -> Result<Vec<(Uuid, Uuid, i32, Uuid)>, AppError> {
     let rows = mail_messages::Entity::find()
         .filter(mail_messages::Column::BodyFetched.eq(false))
         .filter(mail_messages::Column::TextBody.is_null())

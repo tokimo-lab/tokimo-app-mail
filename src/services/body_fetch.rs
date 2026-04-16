@@ -127,11 +127,7 @@ async fn fetch_for_account(
                 let preview = text_body
                     .as_deref()
                     .map(|t| t.chars().take(200).collect::<String>())
-                    .or_else(|| {
-                        html_body
-                            .as_deref()
-                            .map(|html| strip_html_preview(html, 200))
-                    })
+                    .or_else(|| html_body.as_deref().map(|html| strip_html_preview(html, 200)))
                     .unwrap_or_default();
 
                 let cc_json = serde_json::to_value(&full.cc).ok();

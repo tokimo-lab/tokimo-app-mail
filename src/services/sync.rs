@@ -54,10 +54,7 @@ pub async fn sync_account(
     // 2. Sync messages for each folder.
     for folder in &db_folders {
         if let Err(e) = sync_folder_messages(db, &cfg, account_id, folder, event_tx).await {
-            warn!(
-                "Failed to sync folder '{}' for {}: {e}",
-                folder.name, account.email
-            );
+            warn!("Failed to sync folder '{}' for {}: {e}", folder.name, account.email);
         }
     }
 
@@ -97,7 +94,10 @@ async fn sync_folder_messages(
                 Ok(summaries) => {
                     debug!(
                         "Folder '{}': {} on server, {} new (UID > {})",
-                        folder.name, total, summaries.len(), max_uid
+                        folder.name,
+                        total,
+                        summaries.len(),
+                        max_uid
                     );
                     store_summaries_batch(db, account_id, folder, &summaries).await?;
                 }
@@ -118,7 +118,9 @@ async fn sync_folder_messages(
                 Ok(summaries) => {
                     debug!(
                         "Folder '{}': first sync, {} on server, fetched {}",
-                        folder.name, total, summaries.len()
+                        folder.name,
+                        total,
+                        summaries.len()
                     );
                     store_summaries_batch(db, account_id, folder, &summaries).await?;
                 }
@@ -134,8 +136,29 @@ async fn sync_folder_messages(
         match backfill_history_session(db, &mut imap, account_id, folder, cursor).await {
             Ok(new_cursor) => cursor = Some(new_cursor),
             Err(e) => {
-                warn!("History backfill failed for folder '{}': {e}", folder.name);
-                break;
+                // Don't get stuck on a single poisoned batch — advance the
+                // cursor past this range and continue. The inner
+                // fetch_summaries_by_uid_range already bisects past
+                // individual poisoned UIDs; this is a defence-in-depth for
+                // other transient IMAP errors.
+                let cursor_uid = cursor.and_then(|c| u32::try_from(c).ok()).unwrap_or(0);
+                let new_cursor = if cursor_uid > 1 {
+                    Ord::max(cursor_uid.saturating_sub(HISTORY_BATCH_RANGE), 1) as i32
+                } else {
+                    0
+                };
+                warn!(
+                    "History backfill failed for folder '{}' at cursor {:?}: {e}; advancing cursor to {new_cursor}",
+                    folder.name, cursor
+                );
+                if let Err(upd_err) = update_history_cursor(db, folder, new_cursor).await {
+                    warn!("Folder '{}': failed to persist fallback cursor: {upd_err}", folder.name);
+                    break;
+                }
+                cursor = Some(new_cursor);
+                if new_cursor == 0 {
+                    break;
+                }
             }
         }
     }
@@ -143,19 +166,29 @@ async fn sync_folder_messages(
     // ── Phase 3: Reconcile — only after backfill is complete ────────────
     // Skipping during active backfill avoids the expensive list_all_uids
     // IMAP command on every sync tick while history is still being fetched.
+    //
+    // We also pre-fetch local UIDs here so Phase 4 can reuse them.
+    let local_msgs = repos::messages::list_uids_in_folder(db, account_id, folder.id).await.ok();
+
     if cursor == Some(0) {
         match imap.list_all_uids().await {
             Ok(server_uids) => {
-                let valid: Vec<i32> = server_uids.iter().map(|&u| u as i32).collect();
-                match repos::messages::delete_stale_uids(db, account_id, folder.id, &valid).await {
-                    Ok(removed) if removed > 0 => {
-                        info!(
-                            "Folder '{}': removed {} stale messages",
-                            folder.name, removed
-                        );
+                if let Some(ref rows) = local_msgs {
+                    let server_set: std::collections::HashSet<i32> =
+                        server_uids.iter().map(|&u| u as i32).collect();
+                    let stale_ids: Vec<Uuid> = rows
+                        .iter()
+                        .filter(|(_, uid, _)| !server_set.contains(uid))
+                        .map(|(id, _, _)| *id)
+                        .collect();
+                    if !stale_ids.is_empty() {
+                        match repos::messages::delete_many(db, &stale_ids).await {
+                            Ok(()) => {
+                                info!("Folder '{}': removed {} stale messages", folder.name, stale_ids.len());
+                            }
+                            Err(e) => warn!("Folder '{}': reconcile failed: {e}", folder.name),
+                        }
                     }
-                    Err(e) => warn!("Folder '{}': reconcile failed: {e}", folder.name),
-                    _ => {}
                 }
             }
             Err(e) => warn!("Folder '{}': list_all_uids failed: {e}", folder.name),
@@ -163,7 +196,10 @@ async fn sync_folder_messages(
     }
 
     // ── Phase 4: Flag sync ───────────────────────────────────────────────
-    match sync_flags_session(db, &mut imap, account_id, folder).await {
+    // Use a fresh IMAP connection to avoid stream pollution from earlier
+    // large FETCH/SEARCH operations whose residual data can corrupt parsing.
+    imap.logout().await;
+    match sync_flags_session(db, cfg, account_id, folder, local_msgs).await {
         Ok((read_uids, unread_uids)) => {
             if (!read_uids.is_empty() || !unread_uids.is_empty())
                 && let Some(tx) = event_tx
@@ -187,7 +223,6 @@ async fn sync_folder_messages(
     active.updated_at = Set(Utc::now().fixed_offset());
     active.update(db).await?;
 
-    imap.logout().await;
     Ok(())
 }
 
@@ -202,22 +237,15 @@ pub async fn store_summaries_batch(
         return Ok(());
     }
     let candidate_uids: Vec<i32> = summaries.iter().map(|s| s.uid as i32).collect();
-    let existing =
-        repos::messages::existing_uids_in_folder(db, account_id, folder.id, &candidate_uids)
-            .await?;
+    let existing = repos::messages::existing_uids_in_folder(db, account_id, folder.id, &candidate_uids).await?;
 
     let mut stored = 0usize;
     for s in summaries {
         if existing.contains(&(s.uid as i32)) {
             continue;
         }
-        if let Err(e) =
-            repos::messages::create_from_summary(db, account_id, folder.id, s).await
-        {
-            warn!(
-                "Folder '{}': failed to store summary uid={}: {e}",
-                folder.name, s.uid
-            );
+        if let Err(e) = repos::messages::create_from_summary(db, account_id, folder.id, s).await {
+            warn!("Folder '{}': failed to store summary uid={}: {e}", folder.name, s.uid);
         } else {
             stored += 1;
         }
@@ -240,8 +268,7 @@ async fn backfill_history_session(
     let cursor_uid = match cursor {
         Some(c) if c > 0 => c as u32,
         None => {
-            let min_uid =
-                repos::messages::min_uid_in_folder(db, account_id, folder.id).await?;
+            let min_uid = repos::messages::min_uid_in_folder(db, account_id, folder.id).await?;
             match min_uid {
                 Some(uid) if uid > 1 => uid as u32,
                 _ => {
@@ -265,10 +292,7 @@ async fn backfill_history_session(
     debug!("Folder '{}': history backfill UID range {uid_range}", folder.name);
 
     if let Err(e) = imap.open_folder(&folder.name).await {
-        return Err(AppError::Internal(format!(
-            "IMAP re-select '{}': {e}",
-            folder.name
-        )));
+        return Err(AppError::Internal(format!("IMAP re-select '{}': {e}", folder.name)));
     }
 
     let summaries = imap
@@ -312,24 +336,32 @@ const FLAGS_BATCH: usize = 500;
 
 async fn sync_flags_session(
     db: &DatabaseConnection,
-    imap: &mut tokimo_mail::MailSession,
+    cfg: &tokimo_mail::MailAccountConfig,
     account_id: Uuid,
     folder: &mail_folders::Model,
+    prefetched: Option<Vec<(Uuid, i32, bool)>>,
 ) -> Result<(Vec<i32>, Vec<i32>), AppError> {
-    let local_msgs = repos::messages::list_uids_in_folder(db, account_id, folder.id).await?;
-    if local_msgs.is_empty() {
-        return Ok((vec![], vec![]));
-    }
+    let local_msgs = match prefetched {
+        Some(v) if !v.is_empty() => v,
+        Some(_) => return Ok((vec![], vec![])),
+        None => {
+            let v = repos::messages::list_uids_in_folder(db, account_id, folder.id).await?;
+            if v.is_empty() {
+                return Ok((vec![], vec![]));
+            }
+            v
+        }
+    };
+
+    let mut imap = tokimo_mail::MailSession::connect(cfg)
+        .await
+        .map_err(|e| AppError::Internal(format!("IMAP connect for flags '{}': {e}", folder.name)))?;
+    imap.open_folder(&folder.name)
+        .await
+        .map_err(|e| AppError::Internal(format!("IMAP select for flags '{}': {e}", folder.name)))?;
 
     let all_uids: Vec<u32> = local_msgs.iter().map(|(_, uid, _)| *uid as u32).collect();
     let mut imap_flags: std::collections::HashMap<u32, bool> = std::collections::HashMap::new();
-
-    if let Err(e) = imap.open_folder(&folder.name).await {
-        return Err(AppError::Internal(format!(
-            "IMAP select for flags '{}': {e}",
-            folder.name
-        )));
-    }
 
     for chunk in all_uids.chunks(FLAGS_BATCH) {
         let uid_set = chunk
@@ -361,39 +393,30 @@ async fn sync_flags_session(
     }
 
     if !to_mark_read.is_empty() {
-        repos::messages::update_read_by_uids(db, account_id, folder.id, &to_mark_read, true)
-            .await?;
+        repos::messages::update_read_by_uids(db, account_id, folder.id, &to_mark_read, true).await?;
     }
     if !to_mark_unread.is_empty() {
-        repos::messages::update_read_by_uids(db, account_id, folder.id, &to_mark_unread, false)
-            .await?;
+        repos::messages::update_read_by_uids(db, account_id, folder.id, &to_mark_unread, false).await?;
     }
 
+    imap.logout().await;
     Ok((to_mark_read, to_mark_unread))
 }
 
 fn detect_folder_type(raw_name: &str, attributes: &[String]) -> String {
     let decoded = tokimo_mail::decode_mailbox_name(raw_name);
-    let base = decoded
-        .rsplit_once('/')
-        .map_or(decoded.as_str(), |(_, b)| b);
+    let base = decoded.rsplit_once('/').map_or(decoded.as_str(), |(_, b)| b);
     let lower = base.to_lowercase();
     let attr_str = attributes.join(" ").to_lowercase();
 
     if attr_str.contains("\\inbox") || lower == "inbox" {
         return "inbox".into();
     }
-    if attr_str.contains("\\sent")
-        || lower.contains("sent")
-        || base.contains("已发送")
-        || base.contains("送信済み")
+    if attr_str.contains("\\sent") || lower.contains("sent") || base.contains("已发送") || base.contains("送信済み")
     {
         return "sent".into();
     }
-    if attr_str.contains("\\drafts")
-        || lower.contains("draft")
-        || base.contains("草稿")
-        || base.contains("下書き")
+    if attr_str.contains("\\drafts") || lower.contains("draft") || base.contains("草稿") || base.contains("下書き")
     {
         return "drafts".into();
     }
@@ -449,4 +472,3 @@ fn folder_sort_order(folder_type: &str) -> i32 {
         _ => 10,
     }
 }
-

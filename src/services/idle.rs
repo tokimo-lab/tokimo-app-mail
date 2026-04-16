@@ -31,9 +31,7 @@ async fn run_manager(db: DatabaseConnection, event_tx: AppEventSender) {
     let mut account_tasks: HashMap<Uuid, JoinHandle<()>> = HashMap::new();
 
     loop {
-        let accounts = repos::accounts::find_enabled_for_sync(&db)
-            .await
-            .unwrap_or_default();
+        let accounts = repos::accounts::find_enabled_for_sync(&db).await.unwrap_or_default();
 
         info!("IDLE manager: found {} enabled accounts", accounts.len());
 
@@ -94,9 +92,7 @@ async fn run_account_idle(
                 // Small delay: QQ Mail fires EXISTS before the message is available for FETCH.
                 tokio::time::sleep(Duration::from_secs(2)).await;
 
-                let folder = repos::folders::find_inbox(&db, account_id)
-                    .await
-                    .unwrap_or(None);
+                let folder = repos::folders::find_inbox(&db, account_id).await.unwrap_or(None);
 
                 if let Some(folder) = folder {
                     match forward_sync_inbox(&db, &cfg, account_id, &folder, &event_tx).await {
@@ -123,9 +119,7 @@ async fn run_account_idle(
 
 /// Open a fresh connection, SELECT INBOX, enter IDLE for up to 2 minutes.
 /// Returns `Ok(true)` if server pushed new data (EXISTS), `Ok(false)` on clean timeout.
-async fn do_idle_cycle(
-    cfg: &tokimo_mail::MailAccountConfig,
-) -> Result<bool, tokimo_mail::MailError> {
+async fn do_idle_cycle(cfg: &tokimo_mail::MailAccountConfig) -> Result<bool, tokimo_mail::MailError> {
     let mut session = tokimo_mail::MailSession::connect(cfg).await?;
     session.open_folder("INBOX").await?;
     let (session, new_data) = session.into_idle_wait(2 * 60).await?;

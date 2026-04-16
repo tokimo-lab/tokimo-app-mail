@@ -4,10 +4,7 @@ use uuid::Uuid;
 use crate::db::entities::mail_accounts;
 use crate::error::AppError;
 
-pub async fn list_by_user(
-    db: &DatabaseConnection,
-    user_id: Uuid,
-) -> Result<Vec<mail_accounts::Model>, AppError> {
+pub async fn list_by_user(db: &DatabaseConnection, user_id: Uuid) -> Result<Vec<mail_accounts::Model>, AppError> {
     mail_accounts::Entity::find()
         .filter(mail_accounts::Column::UserId.eq(user_id))
         .order_by_asc(mail_accounts::Column::CreatedAt)
@@ -16,10 +13,7 @@ pub async fn list_by_user(
         .map_err(AppError::Database)
 }
 
-pub async fn find_by_id(
-    db: &DatabaseConnection,
-    id: Uuid,
-) -> Result<Option<mail_accounts::Model>, AppError> {
+pub async fn find_by_id(db: &DatabaseConnection, id: Uuid) -> Result<Option<mail_accounts::Model>, AppError> {
     mail_accounts::Entity::find_by_id(id)
         .one(db)
         .await
@@ -38,9 +32,7 @@ pub async fn find_by_id_and_user(
         .map_err(AppError::Database)
 }
 
-pub async fn find_enabled_for_sync(
-    db: &DatabaseConnection,
-) -> Result<Vec<mail_accounts::Model>, AppError> {
+pub async fn find_enabled_for_sync(db: &DatabaseConnection) -> Result<Vec<mail_accounts::Model>, AppError> {
     mail_accounts::Entity::find()
         .filter(mail_accounts::Column::IsEnabled.eq(true))
         .all(db)

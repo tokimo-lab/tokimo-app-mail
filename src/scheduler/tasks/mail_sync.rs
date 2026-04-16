@@ -78,10 +78,7 @@ impl MailSyncTask {
                 continue;
             }
 
-            info!(
-                "MailSyncTask: syncing account {} ({})",
-                account.email, account.id
-            );
+            info!("MailSyncTask: syncing account {} ({})", account.email, account.id);
 
             match crate::apps::mail::services::sync::sync_account(
                 &self.db,

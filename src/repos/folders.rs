@@ -5,10 +5,7 @@ use uuid::Uuid;
 use crate::db::entities::mail_folders;
 use crate::error::AppError;
 
-pub async fn list_by_account(
-    db: &DatabaseConnection,
-    account_id: Uuid,
-) -> Result<Vec<mail_folders::Model>, AppError> {
+pub async fn list_by_account(db: &DatabaseConnection, account_id: Uuid) -> Result<Vec<mail_folders::Model>, AppError> {
     mail_folders::Entity::find()
         .filter(mail_folders::Column::AccountId.eq(account_id))
         .order_by_asc(mail_folders::Column::SortOrder)
@@ -18,10 +15,7 @@ pub async fn list_by_account(
         .map_err(AppError::Database)
 }
 
-pub async fn find_by_id(
-    db: &DatabaseConnection,
-    folder_id: Uuid,
-) -> Result<Option<mail_folders::Model>, AppError> {
+pub async fn find_by_id(db: &DatabaseConnection, folder_id: Uuid) -> Result<Option<mail_folders::Model>, AppError> {
     mail_folders::Entity::find_by_id(folder_id)
         .one(db)
         .await
@@ -29,11 +23,7 @@ pub async fn find_by_id(
 }
 
 /// Update folder's cached unread_count.
-pub async fn update_unread_count(
-    db: &DatabaseConnection,
-    folder_id: Uuid,
-    unread_count: i32,
-) -> Result<(), AppError> {
+pub async fn update_unread_count(db: &DatabaseConnection, folder_id: Uuid, unread_count: i32) -> Result<(), AppError> {
     let now = chrono::Utc::now().fixed_offset();
     mail_folders::Entity::update_many()
         .filter(mail_folders::Column::Id.eq(folder_id))
@@ -112,11 +102,7 @@ pub async fn upsert(
 }
 
 /// Delete folders that no longer exist on the remote server.
-pub async fn delete_absent(
-    db: &DatabaseConnection,
-    account_id: Uuid,
-    existing_names: &[&str],
-) -> Result<(), AppError> {
+pub async fn delete_absent(db: &DatabaseConnection, account_id: Uuid, existing_names: &[&str]) -> Result<(), AppError> {
     if existing_names.is_empty() {
         return Ok(());
     }
@@ -131,10 +117,7 @@ pub async fn delete_absent(
 }
 
 /// Find the INBOX folder for an account (folder_type = "inbox").
-pub async fn find_inbox(
-    db: &DatabaseConnection,
-    account_id: Uuid,
-) -> Result<Option<mail_folders::Model>, AppError> {
+pub async fn find_inbox(db: &DatabaseConnection, account_id: Uuid) -> Result<Option<mail_folders::Model>, AppError> {
     mail_folders::Entity::find()
         .filter(mail_folders::Column::AccountId.eq(account_id))
         .filter(mail_folders::Column::FolderType.eq("inbox"))

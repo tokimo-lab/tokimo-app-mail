@@ -4,10 +4,10 @@ use std::sync::Arc;
 use ts_rs::TS;
 use uuid::Uuid;
 
-use crate::error::AppError;
-use crate::handlers::{ok, ApiResponse};
-use crate::handlers::user::AuthUser;
 use crate::AppState;
+use crate::error::AppError;
+use crate::handlers::user::AuthUser;
+use crate::handlers::{ApiResponse, ok};
 
 use super::super::services;
 

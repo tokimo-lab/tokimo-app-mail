@@ -1,15 +1,13 @@
-use axum::{
-    extract::{Json, Path, Query, State},
-};
+use axum::extract::{Json, Path, Query, State};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use ts_rs::TS;
 use uuid::Uuid;
 
-use crate::error::AppError;
-use crate::handlers::{ok, ApiResponse};
-use crate::handlers::user::AuthUser;
 use crate::AppState;
+use crate::error::AppError;
+use crate::handlers::user::AuthUser;
+use crate::handlers::{ApiResponse, ok};
 
 use super::super::services;
 
@@ -151,8 +149,7 @@ pub async fn list_messages(
     let page = q.page.unwrap_or(1);
     let page_size = q.page_size.unwrap_or(50).min(200);
 
-    let result =
-        services::messages::list_messages(&state.db, uid, aid, fid, page, page_size).await?;
+    let result = services::messages::list_messages(&state.db, uid, aid, fid, page, page_size).await?;
     Ok(ok(result))
 }
 
@@ -242,8 +239,7 @@ pub async fn move_messages(
         .user_id
         .parse()
         .map_err(|_| AppError::BadRequest("invalid user id".into()))?;
-    services::messages::move_messages(&state.db, uid, &body.message_ids, &body.target_folder_id)
-        .await?;
+    services::messages::move_messages(&state.db, uid, &body.message_ids, &body.target_folder_id).await?;
     Ok(ok(()))
 }
 

@@ -106,20 +106,21 @@ export default {
     createFailed: "アカウントの作成に失敗しました：{{error}}",
     cancel: "キャンセル",
   },
+  // ── Account management ──
   account: {
-    editAccount: "アカウント編集",
-    deleteAccount: "アカウント削除",
+    editAccount: "アカウントを編集",
+    deleteAccount: "アカウントを削除",
     confirmDelete:
       "{{email}} を削除してもよろしいですか？このアカウントのすべてのメールも削除されます。",
     deleteSuccess: "アカウントを削除しました",
     deleteFailed: "削除に失敗しました：{{error}}",
     saveSuccess: "アカウントを更新しました",
     saveFailed: "更新に失敗しました：{{error}}",
-    editTitle: "アカウント編集",
+    editTitle: "アカウントを編集",
     serverSettings: "サーバー設定",
-    changePassword: "パスワード変更",
+    changePassword: "パスワードを変更",
     newPassword: "新しいパスワード",
-    newPasswordPlaceholder: "空欄のままにするとパスワードは変更されません",
+    newPasswordPlaceholder: "変更しない場合は空欄のまま",
     save: "保存",
   },
 };

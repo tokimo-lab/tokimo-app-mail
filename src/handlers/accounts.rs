@@ -7,10 +7,10 @@ use std::sync::Arc;
 use ts_rs::TS;
 use uuid::Uuid;
 
-use crate::error::AppError;
-use crate::handlers::{ok, ApiResponse};
-use crate::handlers::user::AuthUser;
 use crate::AppState;
+use crate::error::AppError;
+use crate::handlers::user::AuthUser;
+use crate::handlers::{ApiResponse, ok};
 
 use super::super::services;
 
@@ -128,9 +128,7 @@ pub async fn list_providers() -> impl IntoResponse {
 }
 
 /// GET /api/apps/mail/providers/detect?email=xxx — detect provider from email.
-pub async fn detect_provider(
-    Query(q): Query<DetectProviderQuery>,
-) -> impl IntoResponse {
+pub async fn detect_provider(Query(q): Query<DetectProviderQuery>) -> impl IntoResponse {
     let preset = tokimo_mail::provider::detect_provider(&q.email);
     match preset {
         Some(p) => ok(Some(MailProviderPresetOutput {
@@ -209,8 +207,7 @@ pub async fn update_account(
     let account_id: Uuid = id
         .parse()
         .map_err(|_| AppError::BadRequest("invalid account id".into()))?;
-    let account =
-        services::accounts::update_account(&state.db, uid, account_id, body).await?;
+    let account = services::accounts::update_account(&state.db, uid, account_id, body).await?;
     Ok(ok(account))
 }
 

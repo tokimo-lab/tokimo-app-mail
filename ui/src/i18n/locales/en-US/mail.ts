@@ -106,13 +106,14 @@ export default {
     createFailed: "Failed to create account: {{error}}",
     cancel: "Cancel",
   },
+  // ── Account management ──
   account: {
     editAccount: "Edit Account",
     deleteAccount: "Delete Account",
     confirmDelete:
-      "Are you sure you want to delete {{email}}? All emails for this account will also be removed.",
+      "Are you sure you want to delete {{email}}? All emails from this account will also be removed.",
     deleteSuccess: "Account deleted",
-    deleteFailed: "Delete failed: {{error}}",
+    deleteFailed: "Deletion failed: {{error}}",
     saveSuccess: "Account updated",
     saveFailed: "Update failed: {{error}}",
     editTitle: "Edit Account",

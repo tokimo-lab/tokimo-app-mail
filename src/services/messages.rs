@@ -4,8 +4,8 @@ use uuid::Uuid;
 use crate::error::AppError;
 
 use super::super::handlers::messages::{
-    MailAddressOutput, MailAttachmentOutput, MailMessageFullOutput, MailMessageListOutput,
-    MailMessageSummaryOutput, SendMessageBody,
+    MailAddressOutput, MailAttachmentOutput, MailMessageFullOutput, MailMessageListOutput, MailMessageSummaryOutput,
+    SendMessageBody,
 };
 use super::super::repos;
 use super::accounts::account_to_config;
@@ -24,8 +24,7 @@ pub async fn list_messages(
         .await?
         .ok_or_else(|| AppError::NotFound("Account not found".into()))?;
 
-    let (messages, total) =
-        repos::messages::list_by_folder(db, folder_id, page, page_size).await?;
+    let (messages, total) = repos::messages::list_by_folder(db, folder_id, page, page_size).await?;
 
     let output: Vec<MailMessageSummaryOutput> = messages
         .into_iter()
@@ -123,11 +122,7 @@ pub async fn get_message(
     let to = parse_addrs(&msg.to_addrs);
     let cc = msg.cc_addrs.as_ref().map(parse_addrs).unwrap_or_default();
     let bcc = msg.bcc_addrs.as_ref().map(parse_addrs).unwrap_or_default();
-    let reply_to = msg
-        .reply_to_addrs
-        .as_ref()
-        .map(parse_addrs)
-        .unwrap_or_default();
+    let reply_to = msg.reply_to_addrs.as_ref().map(parse_addrs).unwrap_or_default();
     let refs: Vec<String> = msg
         .refs
         .as_ref()
@@ -169,11 +164,7 @@ pub async fn get_message(
 
 /// Mark messages as read.
 /// Fire-and-forget updates IMAP \Seen flag.
-pub async fn mark_read(
-    db: &DatabaseConnection,
-    user_id: Uuid,
-    message_ids: &[String],
-) -> Result<(), AppError> {
+pub async fn mark_read(db: &DatabaseConnection, user_id: Uuid, message_ids: &[String]) -> Result<(), AppError> {
     let uuids = parse_uuids(message_ids)?;
     repos::messages::update_read_status(db, &uuids, true).await?;
     refresh_folder_unread_counts_for_messages(db, &uuids).await?;
@@ -183,11 +174,7 @@ pub async fn mark_read(
 
 /// Mark messages as unread.
 /// Fire-and-forget updates IMAP \Seen flag.
-pub async fn mark_unread(
-    db: &DatabaseConnection,
-    user_id: Uuid,
-    message_ids: &[String],
-) -> Result<(), AppError> {
+pub async fn mark_unread(db: &DatabaseConnection, user_id: Uuid, message_ids: &[String]) -> Result<(), AppError> {
     let uuids = parse_uuids(message_ids)?;
     repos::messages::update_read_status(db, &uuids, false).await?;
     refresh_folder_unread_counts_for_messages(db, &uuids).await?;
@@ -196,11 +183,7 @@ pub async fn mark_unread(
 }
 
 /// Delete messages (from database; TODO: also from IMAP server).
-pub async fn delete_messages(
-    db: &DatabaseConnection,
-    _user_id: Uuid,
-    message_ids: &[String],
-) -> Result<(), AppError> {
+pub async fn delete_messages(db: &DatabaseConnection, _user_id: Uuid, message_ids: &[String]) -> Result<(), AppError> {
     let uuids = parse_uuids(message_ids)?;
     repos::messages::delete_many(db, &uuids).await
 }
@@ -387,10 +370,7 @@ async fn fetch_message_body_now(
 }
 
 /// Recompute and persist unread_count for a single folder.
-async fn refresh_folder_unread_count(
-    db: &DatabaseConnection,
-    folder_id: Uuid,
-) -> Result<(), AppError> {
+async fn refresh_folder_unread_count(db: &DatabaseConnection, folder_id: Uuid) -> Result<(), AppError> {
     let count = repos::messages::count_unread(db, folder_id).await?;
     repos::folders::update_unread_count(db, folder_id, count as i32).await
 }
@@ -414,15 +394,9 @@ async fn refresh_folder_unread_counts_for_messages(
 
 /// Fire-and-forget: update IMAP flags for a batch of messages.
 /// Groups messages by (account, folder), looks up configs, and spawns a task.
-async fn spawn_imap_flag_update(
-    db: &DatabaseConnection,
-    user_id: Uuid,
-    message_uuids: &[Uuid],
-    mark_read: bool,
-) {
+async fn spawn_imap_flag_update(db: &DatabaseConnection, user_id: Uuid, message_uuids: &[Uuid], mark_read: bool) {
     // Collect (account_id, folder_id, uid) for each message.
-    let mut by_folder: std::collections::HashMap<(Uuid, Uuid), Vec<u32>> =
-        std::collections::HashMap::new();
+    let mut by_folder: std::collections::HashMap<(Uuid, Uuid), Vec<u32>> = std::collections::HashMap::new();
     for &msg_id in message_uuids {
         if let Ok(Some(msg)) = repos::messages::find_by_id(db, msg_id).await {
             by_folder
@@ -433,9 +407,7 @@ async fn spawn_imap_flag_update(
     }
 
     for ((account_id, folder_id), uids) in by_folder {
-        let Ok(Some(account)) =
-            repos::accounts::find_by_id_and_user(db, account_id, user_id).await
-        else {
+        let Ok(Some(account)) = repos::accounts::find_by_id_and_user(db, account_id, user_id).await else {
             continue;
         };
         let Ok(Some(folder)) = repos::folders::find_by_id(db, folder_id).await else {

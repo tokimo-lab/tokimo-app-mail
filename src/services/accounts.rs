@@ -4,16 +4,11 @@ use uuid::Uuid;
 use crate::db::entities::mail_accounts;
 use crate::error::AppError;
 
-use super::super::handlers::accounts::{
-    CreateAccountBody, MailAccountOutput, UpdateAccountBody,
-};
+use super::super::handlers::accounts::{CreateAccountBody, MailAccountOutput, UpdateAccountBody};
 use super::super::repos;
 
 /// List all accounts for a user.
-pub async fn list_accounts(
-    db: &DatabaseConnection,
-    user_id: Uuid,
-) -> Result<Vec<MailAccountOutput>, AppError> {
+pub async fn list_accounts(db: &DatabaseConnection, user_id: Uuid) -> Result<Vec<MailAccountOutput>, AppError> {
     let accounts = repos::accounts::list_by_user(db, user_id).await?;
     Ok(accounts.into_iter().map(model_to_output).collect())
 }
@@ -122,11 +117,7 @@ pub async fn update_account(
 }
 
 /// Delete an account (cascades to folders + messages).
-pub async fn delete_account(
-    db: &DatabaseConnection,
-    user_id: Uuid,
-    account_id: Uuid,
-) -> Result<(), AppError> {
+pub async fn delete_account(db: &DatabaseConnection, user_id: Uuid, account_id: Uuid) -> Result<(), AppError> {
     let existing = repos::accounts::find_by_id_and_user(db, account_id, user_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Mail account not found".into()))?;
@@ -135,11 +126,7 @@ pub async fn delete_account(
 }
 
 /// Test connection for an account.
-pub async fn test_connection(
-    db: &DatabaseConnection,
-    user_id: Uuid,
-    account_id: Uuid,
-) -> Result<(), AppError> {
+pub async fn test_connection(db: &DatabaseConnection, user_id: Uuid, account_id: Uuid) -> Result<(), AppError> {
     let account = repos::accounts::find_by_id_and_user(db, account_id, user_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Mail account not found".into()))?;

@@ -92,9 +92,7 @@ fn model_to_output(m: mail_folders::Model) -> MailFolderOutput {
 fn detect_folder_type(raw_name: &str, attributes: &[String]) -> String {
     let decoded = tokimo_mail::decode_mailbox_name(raw_name);
     // Strip common prefixes like "[Gmail]/" for keyword matching.
-    let base = decoded
-        .rsplit_once('/')
-        .map_or(decoded.as_str(), |(_, b)| b);
+    let base = decoded.rsplit_once('/').map_or(decoded.as_str(), |(_, b)| b);
     let lower = base.to_lowercase();
     let attr_str = attributes.join(" ").to_lowercase();
 
@@ -102,17 +100,11 @@ fn detect_folder_type(raw_name: &str, attributes: &[String]) -> String {
     if attr_str.contains("\\inbox") || lower == "inbox" {
         return "inbox".into();
     }
-    if attr_str.contains("\\sent")
-        || lower.contains("sent")
-        || base.contains("已发送")
-        || base.contains("送信済み")
+    if attr_str.contains("\\sent") || lower.contains("sent") || base.contains("已发送") || base.contains("送信済み")
     {
         return "sent".into();
     }
-    if attr_str.contains("\\drafts")
-        || lower.contains("draft")
-        || base.contains("草稿")
-        || base.contains("下書き")
+    if attr_str.contains("\\drafts") || lower.contains("draft") || base.contains("草稿") || base.contains("下書き")
     {
         return "drafts".into();
     }
