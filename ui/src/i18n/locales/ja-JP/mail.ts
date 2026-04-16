@@ -106,4 +106,20 @@ export default {
     createFailed: "アカウントの作成に失敗しました：{{error}}",
     cancel: "キャンセル",
   },
+  account: {
+    editAccount: "アカウント編集",
+    deleteAccount: "アカウント削除",
+    confirmDelete:
+      "{{email}} を削除してもよろしいですか？このアカウントのすべてのメールも削除されます。",
+    deleteSuccess: "アカウントを削除しました",
+    deleteFailed: "削除に失敗しました：{{error}}",
+    saveSuccess: "アカウントを更新しました",
+    saveFailed: "更新に失敗しました：{{error}}",
+    editTitle: "アカウント編集",
+    serverSettings: "サーバー設定",
+    changePassword: "パスワード変更",
+    newPassword: "新しいパスワード",
+    newPasswordPlaceholder: "空欄のままにするとパスワードは変更されません",
+    save: "保存",
+  },
 };

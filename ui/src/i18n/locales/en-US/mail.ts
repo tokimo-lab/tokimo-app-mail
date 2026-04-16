@@ -106,4 +106,20 @@ export default {
     createFailed: "Failed to create account: {{error}}",
     cancel: "Cancel",
   },
+  account: {
+    editAccount: "Edit Account",
+    deleteAccount: "Delete Account",
+    confirmDelete:
+      "Are you sure you want to delete {{email}}? All emails for this account will also be removed.",
+    deleteSuccess: "Account deleted",
+    deleteFailed: "Delete failed: {{error}}",
+    saveSuccess: "Account updated",
+    saveFailed: "Update failed: {{error}}",
+    editTitle: "Edit Account",
+    serverSettings: "Server Settings",
+    changePassword: "Change Password",
+    newPassword: "New Password",
+    newPasswordPlaceholder: "Leave blank to keep current password",
+    save: "Save",
+  },
 };
