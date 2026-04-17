@@ -252,6 +252,22 @@ pub async fn delete_many(db: &DatabaseConnection, ids: &[Uuid]) -> Result<(), Ap
     Ok(())
 }
 
+/// Delete every message in a folder. Used by UIDVALIDITY recovery —
+/// once the server's UID space changes, all local UIDs are meaningless.
+pub async fn delete_all_in_folder(
+    db: &DatabaseConnection,
+    account_id: Uuid,
+    folder_id: Uuid,
+) -> Result<u64, AppError> {
+    let res = mail_messages::Entity::delete_many()
+        .filter(mail_messages::Column::AccountId.eq(account_id))
+        .filter(mail_messages::Column::FolderId.eq(folder_id))
+        .exec(db)
+        .await
+        .map_err(AppError::Database)?;
+    Ok(res.rows_affected)
+}
+
 /// Reset body_fetched to false so the on-demand fetcher will re-download the body.
 pub async fn reset_body_fetched(db: &DatabaseConnection, id: Uuid) -> Result<(), AppError> {
     mail_messages::Entity::update_many()

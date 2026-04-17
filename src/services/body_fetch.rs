@@ -172,7 +172,7 @@ async fn fetch_for_account(
                     }
                 }
 
-                debug!("Body fetch: stored body for uid={uid} in '{folder_name}'");
+                // debug!("Body fetch: stored body for uid={uid} in '{folder_name}'");
             }
         }
     }

@@ -80,14 +80,52 @@ async fn sync_folder_messages(
         .await
         .map_err(|e| AppError::Internal(format!("IMAP connect for '{}': {e}", folder.name)))?;
 
+    // ── Phase 0: UIDVALIDITY check (RFC 3501 §2.3.1.1) ───────────────────
+    // If the server's UIDVALIDITY differs from what we cached, every
+    // previously-stored UID is meaningless. Purge the folder and restart
+    // from a clean slate; otherwise subsequent forward/backfill phases
+    // would write into the wrong UID space.
+    let (total, _unseen, uid_validity) = imap
+        .open_folder_ex(&folder.name)
+        .await
+        .map_err(|e| AppError::Internal(format!("IMAP select '{}': {e}", folder.name)))?;
+
+    #[allow(clippy::cast_possible_wrap)]
+    let folder = if let Some(server_uv) = uid_validity {
+        let server_stored = server_uv as i32;
+        match folder.uid_validity {
+            Some(cached) if cached == server_stored => folder.clone(),
+            Some(cached) => {
+                warn!(
+                    "Folder '{}': UIDVALIDITY changed {cached} → {server_uv}; purging local cache and resyncing",
+                    folder.name
+                );
+                let removed = repos::messages::delete_all_in_folder(db, account_id, folder.id).await?;
+                info!("Folder '{}': purged {removed} messages after UIDVALIDITY change", folder.name);
+                repos::folders::reset_uid_validity(db, folder.id, server_uv).await?;
+                // Reload to pick up the cleared cursor / new uid_validity.
+                repos::folders::find_by_id(db, folder.id)
+                    .await?
+                    .ok_or_else(|| AppError::Internal(format!("Folder {} vanished during resync", folder.id)))?
+            }
+            None => {
+                // First time we see this folder — just record the value.
+                repos::folders::reset_uid_validity(db, folder.id, server_uv).await?;
+                repos::folders::find_by_id(db, folder.id)
+                    .await?
+                    .ok_or_else(|| AppError::Internal(format!("Folder {} vanished during resync", folder.id)))?
+            }
+        }
+    } else {
+        debug!("Folder '{}': server did not return UIDVALIDITY", folder.name);
+        folder.clone()
+    };
+    let folder = &folder;
+
     // ── Phase 1: Forward sync (new summaries) ─────────────────────────────
     let max_uid = repos::messages::max_uid_in_folder(db, account_id, folder.id).await?;
 
     let total = if let Some(max_uid) = max_uid {
-        let (total, _) = imap
-            .open_folder(&folder.name)
-            .await
-            .map_err(|e| AppError::Internal(format!("IMAP select '{}': {e}", folder.name)))?;
         if total > 0 {
             let uid_range = format!("{}:*", max_uid + 1);
             match imap.fetch_summaries_by_uids(&uid_range).await {
@@ -107,10 +145,6 @@ async fn sync_folder_messages(
         total
     } else {
         // Very first sync — grab the last 200 by sequence number.
-        let (total, _) = imap
-            .open_folder(&folder.name)
-            .await
-            .map_err(|e| AppError::Internal(format!("IMAP select '{}': {e}", folder.name)))?;
         if total > 0 {
             let start = total.saturating_sub(199);
             let seq_range = format!("{start}:{total}");
