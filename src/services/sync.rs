@@ -101,7 +101,10 @@ async fn sync_folder_messages(
                     folder.name
                 );
                 let removed = repos::messages::delete_all_in_folder(db, account_id, folder.id).await?;
-                info!("Folder '{}': purged {removed} messages after UIDVALIDITY change", folder.name);
+                info!(
+                    "Folder '{}': purged {removed} messages after UIDVALIDITY change",
+                    folder.name
+                );
                 repos::folders::reset_uid_validity(db, folder.id, server_uv).await?;
                 // Reload to pick up the cleared cursor / new uid_validity.
                 repos::folders::find_by_id(db, folder.id)
@@ -202,14 +205,15 @@ async fn sync_folder_messages(
     // IMAP command on every sync tick while history is still being fetched.
     //
     // We also pre-fetch local UIDs here so Phase 4 can reuse them.
-    let local_msgs = repos::messages::list_uids_in_folder(db, account_id, folder.id).await.ok();
+    let local_msgs = repos::messages::list_uids_in_folder(db, account_id, folder.id)
+        .await
+        .ok();
 
     if cursor == Some(0) {
         match imap.list_all_uids().await {
             Ok(server_uids) => {
                 if let Some(ref rows) = local_msgs {
-                    let server_set: std::collections::HashSet<i32> =
-                        server_uids.iter().map(|&u| u as i32).collect();
+                    let server_set: std::collections::HashSet<i32> = server_uids.iter().map(|&u| u as i32).collect();
                     let stale_ids: Vec<Uuid> = rows
                         .iter()
                         .filter(|(_, uid, _)| !server_set.contains(uid))

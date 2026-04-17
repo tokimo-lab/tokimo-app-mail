@@ -37,11 +37,7 @@ pub async fn update_unread_count(db: &DatabaseConnection, folder_id: Uuid, unrea
 
 /// Persist a new `UIDVALIDITY` value and reset the history sync cursor so
 /// the next run rebuilds the folder from scratch (RFC 3501 §2.3.1.1).
-pub async fn reset_uid_validity(
-    db: &DatabaseConnection,
-    folder_id: Uuid,
-    uid_validity: u32,
-) -> Result<(), AppError> {
+pub async fn reset_uid_validity(db: &DatabaseConnection, folder_id: Uuid, uid_validity: u32) -> Result<(), AppError> {
     let now = chrono::Utc::now().fixed_offset();
     // Store as i32 via bit-cast; UIDVALIDITY is only ever compared for
     // equality, never interpreted as a number, so the signed/unsigned
@@ -51,7 +47,10 @@ pub async fn reset_uid_validity(
     mail_folders::Entity::update_many()
         .filter(mail_folders::Column::Id.eq(folder_id))
         .col_expr(mail_folders::Column::UidValidity, Expr::value(stored))
-        .col_expr(mail_folders::Column::HistorySyncCursor, Expr::value(Option::<i32>::None))
+        .col_expr(
+            mail_folders::Column::HistorySyncCursor,
+            Expr::value(Option::<i32>::None),
+        )
         .col_expr(mail_folders::Column::UpdatedAt, Expr::value(now))
         .exec(db)
         .await
