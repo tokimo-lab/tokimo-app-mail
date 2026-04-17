@@ -133,13 +133,13 @@ async fn sync_folder_messages(
             let uid_range = format!("{}:*", max_uid + 1);
             match imap.fetch_summaries_by_uids(&uid_range).await {
                 Ok(summaries) => {
-                    debug!(
-                        "Folder '{}': {} on server, {} new (UID > {})",
-                        folder.name,
-                        total,
-                        summaries.len(),
-                        max_uid
-                    );
+                    // debug!(
+                    //     "Folder '{}': {} on server, {} new (UID > {})",
+                    //     folder.name,
+                    //     total,
+                    //     summaries.len(),
+                    //     max_uid
+                    // );
                     store_summaries_batch(db, account_id, folder, &summaries).await?;
                 }
                 Err(e) => warn!("Folder '{}': forward sync fetch failed: {e}", folder.name),
@@ -153,12 +153,12 @@ async fn sync_folder_messages(
             let seq_range = format!("{start}:{total}");
             match imap.fetch_summaries_by_uids(&seq_range).await {
                 Ok(summaries) => {
-                    debug!(
-                        "Folder '{}': first sync, {} on server, fetched {}",
-                        folder.name,
-                        total,
-                        summaries.len()
-                    );
+                    // debug!(
+                    //     "Folder '{}': first sync, {} on server, fetched {}",
+                    //     folder.name,
+                    //     total,
+                    //     summaries.len()
+                    // );
                     store_summaries_batch(db, account_id, folder, &summaries).await?;
                 }
                 Err(e) => warn!("Folder '{}': first fetch failed: {e}", folder.name),
