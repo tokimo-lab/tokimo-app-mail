@@ -63,7 +63,6 @@ pub async fn sync_account(
     active.last_sync_at = Set(Some(Utc::now().fixed_offset()));
     active.updated_at = Set(Utc::now().fixed_offset());
     active.update(db).await?;
-
     info!("Mail sync completed for account_id={account_id}");
     Ok(())
 }
