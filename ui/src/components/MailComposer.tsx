@@ -6,7 +6,7 @@ import {
   Spin,
   TextArea,
   useForm,
-} from "@tokiomo/components";
+} from "@tokimo/ui";
 import { Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";

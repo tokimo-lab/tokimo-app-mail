@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Empty, Modal, Spin } from "@tokiomo/components";
+import { Empty, Modal, Spin } from "@tokimo/ui";
 import { Mail } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";

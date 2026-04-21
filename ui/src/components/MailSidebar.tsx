@@ -8,7 +8,7 @@ import {
   cn,
   Spin,
   Tooltip,
-} from "@tokiomo/components";
+} from "@tokimo/ui";
 import {
   AlertCircle,
   Archive,

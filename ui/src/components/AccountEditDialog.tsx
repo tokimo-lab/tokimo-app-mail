@@ -12,7 +12,7 @@ import {
   Password,
   ScrollArea,
   Select,
-} from "@tokiomo/components";
+} from "@tokimo/ui";
 import { useTranslation } from "react-i18next";
 import { api } from "@/generated/rust-api";
 import type { MailAccountOutput } from "@/generated/rust-api/mail";

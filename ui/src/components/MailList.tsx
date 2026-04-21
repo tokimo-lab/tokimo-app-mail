@@ -7,7 +7,7 @@ import {
   SearchInput,
   Spin,
   Tooltip,
-} from "@tokiomo/components";
+} from "@tokimo/ui";
 import { Inbox, Paperclip, Star, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";

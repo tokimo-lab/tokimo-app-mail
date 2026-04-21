@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Button, Empty, ScrollArea, Spin, Tooltip } from "@tokiomo/components";
+import { Button, Empty, ScrollArea, Spin, Tooltip } from "@tokimo/ui";
 import DOMPurify from "dompurify";
 import {
   ArrowLeft,

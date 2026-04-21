@@ -11,7 +11,7 @@ import {
   Select,
   Spin,
   useForm,
-} from "@tokiomo/components";
+} from "@tokimo/ui";
 import {
   ArrowLeft,
   ArrowRight,

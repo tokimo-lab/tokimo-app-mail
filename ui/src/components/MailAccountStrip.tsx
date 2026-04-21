@@ -1,4 +1,4 @@
-import { cn, Tooltip } from "@tokiomo/components";
+import { cn, Tooltip } from "@tokimo/ui";
 import { Pencil, Plus, RefreshCw } from "lucide-react";
 import { api } from "@/generated/rust-api";
 import type { MailAccountOutput } from "@/generated/rust-api/mail";

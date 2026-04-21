@@ -1,4 +1,4 @@
-import { Badge, cn, ScrollArea, Spin } from "@tokiomo/components";
+import { Badge, cn, ScrollArea, Spin } from "@tokimo/ui";
 import {
   AlertCircle,
   AlertTriangle,
