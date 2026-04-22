@@ -17,7 +17,7 @@ import type {
   MailAddressOutput,
   MailMessageFullOutput,
 } from "@/generated/rust-api/mail";
-import { useDateFormat } from "@/system/appearance/ThemeContext";
+import { useDateFormat } from "@/system";
 
 interface MailViewerProps {
   messageId: string;
