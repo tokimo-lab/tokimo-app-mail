@@ -33,7 +33,7 @@ impl ScheduledTask for MailSyncTask {
 
     fn interval(&self) -> Duration {
         // Check every 60 seconds for accounts that need syncing.
-        Duration::from_secs(60)
+        Duration::from_mins(1)
     }
 
     fn run_on_startup(&self) -> bool {

@@ -111,7 +111,7 @@ async fn run_account_idle(
             Err(e) => {
                 warn!("IDLE error for {account_id}: {e}, retry in {backoff:?}");
                 tokio::time::sleep(backoff).await;
-                backoff = (backoff * 2).min(Duration::from_secs(300));
+                backoff = (backoff * 2).min(Duration::from_mins(5));
             }
         }
     }
