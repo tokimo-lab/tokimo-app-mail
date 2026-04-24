@@ -119,15 +119,17 @@ function AccountItem({
     return (
       <Tooltip title={account.displayName || account.email} placement="right">
         <ContextMenu items={menuItems}>
-          <div className="relative">
-            {/* Vertical accent indicator matching AppSidebar collapsed style */}
+          <div className="relative flex w-full justify-center">
+            {/* Vertical accent indicator hugging the rail edge — matches
+                AppSidebar collapsed style. left:0 anchors to the rail
+                edge thanks to the full-width wrapper. */}
             {isSelected && (
               <span className="pointer-events-none absolute top-1/2 left-0 z-10 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-[var(--accent)]" />
             )}
             <button
               type="button"
               onClick={onSelect}
-              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg transition-colors"
+              className="relative flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg transition-colors"
             >
               <div
                 className="flex size-7 items-center justify-center rounded-lg text-[11px] font-semibold text-white"
@@ -135,16 +137,16 @@ function AccountItem({
               >
                 {initial}
               </div>
+              {unread > 0 && (
+                <span className="pointer-events-none absolute -top-1 -right-1">
+                  <Badge
+                    count={unread}
+                    size="small"
+                    overflowCount={Number.POSITIVE_INFINITY}
+                  />
+                </span>
+              )}
             </button>
-            {unread > 0 && (
-              <span className="pointer-events-none absolute -top-1 -right-1">
-                <Badge
-                  count={unread}
-                  size="small"
-                  overflowCount={Number.POSITIVE_INFINITY}
-                />
-              </span>
-            )}
           </div>
         </ContextMenu>
       </Tooltip>
@@ -395,7 +397,7 @@ export function MailSidebar({
         style={{ width: 48 }}
       >
         {/* Accounts — fixed header, no scroll */}
-        <div className="flex shrink-0 flex-col items-center gap-0.5 px-1 pt-2">
+        <div className="flex shrink-0 flex-col gap-0.5 pt-2">
           {accounts.map((account, i) => (
             <AccountItem
               key={account.id}
