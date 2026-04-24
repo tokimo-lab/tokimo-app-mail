@@ -391,40 +391,40 @@ export function MailSidebar({
   if (collapsed) {
     return (
       <div
-        className="relative flex shrink-0 flex-col overflow-hidden border-r border-border-base bg-[var(--sidebar-bg)] select-none"
+        className="relative flex h-full shrink-0 flex-col border-r border-border-base bg-[var(--sidebar-bg)] select-none"
         style={{ width: 48 }}
       >
-        <div className="flex flex-1 flex-col overflow-y-auto">
-          {/* Accounts */}
-          <div className="flex flex-col items-center gap-0.5 px-1 pt-2">
-            {accounts.map((account, i) => (
-              <AccountItem
-                key={account.id}
-                account={account}
-                colorIndex={i}
-                isSelected={selectedAccountId === account.id}
-                collapsed
-                onSelect={() => {
-                  if (account.id !== selectedAccountId) {
-                    onSelectAccount(account.id);
-                    autoSelectedRef.current = null;
-                  }
-                }}
-                onEdit={() => onEditAccount(account)}
-                onDelete={() => onDeleteAccount(account)}
-              />
-            ))}
-          </div>
+        {/* Accounts — fixed header, no scroll */}
+        <div className="flex shrink-0 flex-col items-center gap-0.5 px-1 pt-2">
+          {accounts.map((account, i) => (
+            <AccountItem
+              key={account.id}
+              account={account}
+              colorIndex={i}
+              isSelected={selectedAccountId === account.id}
+              collapsed
+              onSelect={() => {
+                if (account.id !== selectedAccountId) {
+                  onSelectAccount(account.id);
+                  autoSelectedRef.current = null;
+                }
+              }}
+              onEdit={() => onEditAccount(account)}
+              onDelete={() => onDeleteAccount(account)}
+            />
+          ))}
           {/* Separator */}
-          <div className="mx-auto my-1 w-6 border-t border-black/[0.08] dark:border-white/[0.08]" />
-          {/* Folders via AppSidebar-style items */}
+          <div className="my-1 w-6 border-t border-black/[0.08] dark:border-white/[0.08]" />
+        </div>
+        {/* Folders — AppSidebar (default mode) takes remaining height with its
+            own ScrollArea + floating hover-expand overlay anchored here. */}
+        <div className="relative flex min-h-0 flex-1">
           <AppSidebar
             sections={folderSections}
             activeKey={selectedFolderId ?? undefined}
             onSelect={onSelectFolder}
             collapsed
-            _inline
-            className="!w-full !border-r-0"
+            width={188}
           />
         </div>
         <div className="shrink-0 border-t border-black/[0.06] px-1 py-1 dark:border-white/[0.08]">
@@ -436,11 +436,11 @@ export function MailSidebar({
 
   return (
     <div
-      className="relative flex shrink-0 flex-col overflow-hidden border-r border-border-base bg-[var(--sidebar-bg)] select-none"
+      className="relative flex h-full shrink-0 flex-col border-r border-border-base bg-[var(--sidebar-bg)] select-none"
       style={{ width: 188 }}
     >
-      <div className="flex flex-1 flex-col overflow-y-auto px-2 pt-3">
-        {/* Accounts section */}
+      {/* Accounts — fixed header, no scroll */}
+      <div className="flex shrink-0 flex-col px-2 pt-3">
         <div className="mb-1 px-3 text-[11px] font-medium uppercase tracking-wider text-fg-muted">
           {t("mail.sidebar.accounts")}
         </div>
@@ -460,19 +460,19 @@ export function MailSidebar({
             onDelete={() => onDeleteAccount(account)}
           />
         ))}
-        {/* Folders section via AppSidebar */}
-        {folderSections.length > 0 && (
-          <div className="mt-1">
-            <AppSidebar
-              sections={folderSections}
-              activeKey={selectedFolderId ?? undefined}
-              onSelect={onSelectFolder}
-              _inline
-              className="!w-full !border-r-0 !bg-transparent !pt-0"
-            />
-          </div>
-        )}
       </div>
+      {/* Folders — AppSidebar (default mode) takes remaining height with its
+          own ScrollArea. */}
+      {folderSections.length > 0 && (
+        <div className="relative mt-1 flex min-h-0 flex-1">
+          <AppSidebar
+            sections={folderSections}
+            activeKey={selectedFolderId ?? undefined}
+            onSelect={onSelectFolder}
+            width={188}
+          />
+        </div>
+      )}
       <div className="shrink-0 border-t border-black/[0.06] px-2 py-2 dark:border-white/[0.08]">
         {fullFooter}
       </div>
