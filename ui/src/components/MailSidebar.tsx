@@ -391,7 +391,7 @@ export function MailSidebar({
   if (collapsed) {
     return (
       <div
-        className="flex shrink-0 flex-col overflow-hidden border-r border-border-base bg-[var(--sidebar-bg)] select-none"
+        className="relative flex shrink-0 flex-col overflow-hidden border-r border-border-base bg-[var(--sidebar-bg)] select-none"
         style={{ width: 48 }}
       >
         <div className="flex flex-1 flex-col overflow-y-auto">
@@ -435,7 +435,7 @@ export function MailSidebar({
 
   return (
     <div
-      className="flex shrink-0 flex-col overflow-hidden border-r border-border-base bg-[var(--sidebar-bg)] select-none"
+      className="relative flex shrink-0 flex-col overflow-hidden border-r border-border-base bg-[var(--sidebar-bg)] select-none"
       style={{ width: 188 }}
     >
       <div className="flex flex-1 flex-col overflow-y-auto px-2 pt-3">
