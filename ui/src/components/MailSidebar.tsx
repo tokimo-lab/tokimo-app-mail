@@ -6,6 +6,7 @@ import {
   ContextMenu,
   type ContextMenuItem,
   cn,
+  MaterialFileIcon,
   Spin,
   Tooltip,
 } from "@tokimo/ui";
@@ -30,7 +31,6 @@ import type {
   MailAccountOutput,
   MailFolderOutput,
 } from "@/generated/rust-api/mail";
-import { MaterialFileIcon } from "@/shared/components/icons/MaterialFileIcon";
 import { useWs } from "@/system/events/ws";
 
 const SPECIAL_FOLDER_ICONS: Record<string, typeof Inbox> = {

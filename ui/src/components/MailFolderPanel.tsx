@@ -1,4 +1,4 @@
-import { Badge, cn, ScrollArea, Spin } from "@tokimo/ui";
+import { Badge, cn, MaterialFileIcon, ScrollArea, Spin } from "@tokimo/ui";
 import {
   AlertCircle,
   AlertTriangle,
@@ -12,7 +12,6 @@ import {
 import { useEffect, useRef } from "react";
 import { api } from "@/generated/rust-api";
 import type { MailFolderOutput } from "@/generated/rust-api/mail";
-import { MaterialFileIcon } from "@/shared/components/icons/MaterialFileIcon";
 
 const SPECIAL_FOLDER_ICONS: Record<string, typeof Inbox> = {
   inbox: Inbox,
