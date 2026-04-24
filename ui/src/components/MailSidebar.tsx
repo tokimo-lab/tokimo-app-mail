@@ -423,6 +423,7 @@ export function MailSidebar({
             activeKey={selectedFolderId ?? undefined}
             onSelect={onSelectFolder}
             collapsed
+            _inline
             className="!w-full !border-r-0"
           />
         </div>
@@ -466,6 +467,7 @@ export function MailSidebar({
               sections={folderSections}
               activeKey={selectedFolderId ?? undefined}
               onSelect={onSelectFolder}
+              _inline
               className="!w-full !border-r-0 !bg-transparent !pt-0"
             />
           </div>
