@@ -241,13 +241,12 @@ export function MailSidebar({
       : []),
   ];
 
-  // Account + folder are both "active" simultaneously: pass an array so
-  // AppSidebar renders a static accent bar on each match (see AppSidebar
-  // multi-selection contract).
-  const activeKey: string[] = [
-    ...(selectedAccountId ? [ACCOUNT_KEY_PREFIX + selectedAccountId] : []),
-    ...(selectedFolderId ? [selectedFolderId] : []),
-  ];
+  // Folder is the primary selection (gets the sliding indicator); account
+  // tags along as a secondary highlight via activeKeys.
+  const activeKey = selectedFolderId ?? undefined;
+  const activeKeys = selectedAccountId
+    ? [ACCOUNT_KEY_PREFIX + selectedAccountId]
+    : undefined;
 
   const handleSelect = (key: string) => {
     if (key.startsWith(ACCOUNT_KEY_PREFIX)) {
@@ -296,6 +295,7 @@ export function MailSidebar({
       <AppSidebar
         sections={sections}
         activeKey={activeKey}
+        activeKeys={activeKeys}
         onSelect={handleSelect}
         collapsed={collapsed}
         onToggleCollapsed={onToggleCollapse}
