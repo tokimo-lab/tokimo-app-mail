@@ -199,10 +199,6 @@ export function MailSidebar({
     tooltip: account.displayName || account.email,
     extra: <AccountUnreadBadge accountId={account.id} />,
     onContextMenu: (e) => ctxMenu.open(e, buildAccountMenu(account)),
-    // Account selection runs in parallel with folder navigation — show a
-    // static accent bar on the current account so users can see "which inbox
-    // am I in" even when activeKey is a folder id.
-    active: account.id === selectedAccountId,
   }));
 
   const folderItems: AppSidebarItem[] = folderQuery.isLoading
@@ -245,11 +241,13 @@ export function MailSidebar({
       : []),
   ];
 
-  const activeKey = selectedFolderId
-    ? selectedFolderId
-    : selectedAccountId
-      ? ACCOUNT_KEY_PREFIX + selectedAccountId
-      : undefined;
+  // Account + folder are both "active" simultaneously: pass an array so
+  // AppSidebar renders a static accent bar on each match (see AppSidebar
+  // multi-selection contract).
+  const activeKey: string[] = [
+    ...(selectedAccountId ? [ACCOUNT_KEY_PREFIX + selectedAccountId] : []),
+    ...(selectedFolderId ? [selectedFolderId] : []),
+  ];
 
   const handleSelect = (key: string) => {
     if (key.startsWith(ACCOUNT_KEY_PREFIX)) {
