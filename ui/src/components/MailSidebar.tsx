@@ -302,6 +302,8 @@ export function MailSidebar({
         collapsed={collapsed}
         onToggleCollapsed={onToggleCollapse}
         footerActions={footerActions}
+        collapseLabel={t("mail.sidebar.collapseSidebar")}
+        expandLabel={t("mail.sidebar.expandSidebar")}
         width={188}
       />
       {ctxMenu.contextMenu}
