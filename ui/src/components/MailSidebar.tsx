@@ -6,7 +6,6 @@ import {
   type AppSidebarSection,
   Badge,
   type ContextMenuItem,
-  cn,
   MaterialFileIcon,
   Spin,
   useContextMenu,
