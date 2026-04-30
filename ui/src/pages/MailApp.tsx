@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Empty, Modal, Spin } from "@tokimo/ui";
-import { Mail } from "lucide-react";
+import { AppSetupGuide, Empty, Modal, Spin } from "@tokimo/ui";
+import { Inbox, Mail, Plus, Send } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "@/generated/rust-api";
@@ -12,7 +12,6 @@ import { useMessage } from "@/system/notifications/useMessage";
 import { useWindowNav } from "@/system/window/WindowNavContext";
 import type { TaskMetadata } from "@/system/window/window-types";
 import { AccountEditDialog } from "../components/AccountEditDialog";
-import { AccountSetup } from "../components/AccountSetup";
 import { MailList } from "../components/MailList";
 import { MailSidebar } from "../components/MailSidebar";
 import { MailViewer } from "../components/MailViewer";
@@ -188,9 +187,27 @@ export default function MailApp() {
     );
   }
 
-  // No accounts configured — show setup inline.
+  // No accounts configured — show setup guide.
   if (accounts.length === 0) {
-    return <AccountSetup onComplete={() => {}} />;
+    return (
+      <AppSetupGuide
+        imageSrc="/page-icons/mail.png"
+        accentColor="blue"
+        title={t("common.setupGuide.getStarted", { name: "Mail" })}
+        description={t("common.setupGuide.mailTagline")}
+        features={(
+          t("common.setupGuide.mailFeatures", {
+            returnObjects: true,
+          }) as string[]
+        ).map((label, i) => ({
+          icon: [Plus, Inbox, Send][i],
+          label,
+        }))}
+        actionLabel={t("common.setupGuide.mailAction")}
+        actionIcon={Plus}
+        onAction={handleAddAccount}
+      />
+    );
   }
 
   return (

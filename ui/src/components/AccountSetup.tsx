@@ -15,8 +15,6 @@ import {
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
-  CheckCircle2,
   ChevronRight,
   Globe,
   Mail,
@@ -55,15 +53,32 @@ interface CredentialValues {
   useSeparateSmtp: boolean;
 }
 
-type Step = "provider" | "credentials" | "test";
+type Step = "provider" | "credentials";
+type SubmitState = "idle" | "loading" | "success" | "error";
 
 export function AccountSetup({ onComplete, onCancel }: AccountSetupProps) {
   const { t } = useTranslation();
+  const msg = useMessage();
+  const qc = useQueryClient();
   const [step, setStep] = useState<Step>("provider");
   const [selectedPreset, setSelectedPreset] =
     useState<MailProviderPresetOutput | null>(null);
   const [isCustom, setIsCustom] = useState(false);
   const [form] = useForm();
+  const [submitState, setSubmitState] = useState<SubmitState>("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const createAccount = api.mail.createAccount.useMutation({
+    onSuccess: () => {
+      api.mail.listAccounts.invalidate(qc);
+      onComplete();
+    },
+    onError: (err) => {
+      setSubmitState("error");
+      setErrorMsg(err.message);
+      msg.error(t("mail.setup.createFailed", { error: err.message }));
+    },
+  });
 
   const handleSelectPreset = (preset: MailProviderPresetOutput) => {
     setSelectedPreset(preset);
@@ -86,86 +101,100 @@ export function AccountSetup({ onComplete, onCancel }: AccountSetupProps) {
   };
 
   const handleBack = () => {
-    if (step === "credentials") setStep("provider");
-    if (step === "test") setStep("credentials");
+    if (step === "credentials") {
+      setSubmitState("idle");
+      setStep("provider");
+    }
   };
 
-  const values = form.getFieldsValue() as CredentialValues;
+  const handleSubmit = async () => {
+    try {
+      await form.validateFields();
+    } catch {
+      return;
+    }
+    const values = form.getFieldsValue() as CredentialValues;
+    setSubmitState("loading");
+    createAccount.mutate({
+      display_name: values.displayName || values.email,
+      email: values.email,
+      provider: selectedPreset?.provider,
+      imap_host: values.imapHost,
+      imap_port: values.imapPort
+        ? Number.parseInt(values.imapPort, 10)
+        : undefined,
+      imap_security: values.imapSecurity,
+      imap_username: values.email,
+      imap_password: values.password,
+      smtp_host: values.smtpHost,
+      smtp_port: values.smtpPort
+        ? Number.parseInt(values.smtpPort, 10)
+        : undefined,
+      smtp_security: values.smtpSecurity,
+      smtp_username: values.smtpUsername || values.email,
+      smtp_password: values.smtpPassword || values.password,
+    });
+  };
 
   return (
-    <div className="flex h-full items-center justify-center bg-surface-base">
-      <div className="flex h-[550px] w-[600px] flex-col rounded-xl border border-border-base bg-surface-elevated shadow-lg">
-        {/* Header */}
-        <div className="flex items-center gap-3 border-b border-border-base px-5 py-4">
-          {step !== "provider" && (
-            <button
-              type="button"
-              className="cursor-pointer rounded p-1 text-fg-muted hover:text-fg-primary"
-              onClick={handleBack}
-            >
-              <ArrowLeft className="size-4" />
-            </button>
-          )}
-          <Mail className="size-5 text-accent" />
-          <h2 className="text-base font-semibold text-fg-primary">
-            {step === "provider" && t("mail.setup.addAccount")}
-            {step === "credentials" &&
-              (selectedPreset
-                ? t("mail.setup.setupProvider", {
-                    provider: selectedPreset.displayName,
-                  })
-                : t("mail.setup.manualConfig"))}
-            {step === "test" && t("mail.setup.testingConnection")}
-          </h2>
-          {onCancel && (
-            <button
-              type="button"
-              className="ml-auto cursor-pointer text-sm text-fg-muted hover:text-fg-primary"
-              onClick={onCancel}
-            >
-              {t("mail.setup.cancel")}
-            </button>
-          )}
-        </div>
+    <div className="flex h-full flex-col">
+      {/* Header */}
+      <div className="flex items-center gap-3 border-b border-border-base px-5 py-4">
+        {step !== "provider" && (
+          <button
+            type="button"
+            className="cursor-pointer rounded p-1 text-fg-muted hover:text-fg-primary"
+            onClick={handleBack}
+          >
+            <ArrowLeft className="size-4" />
+          </button>
+        )}
+        <Mail className="size-5 text-accent" />
+        <h2 className="text-base font-semibold text-fg-primary">
+          {step === "provider" && t("mail.setup.addAccount")}
+          {step === "credentials" &&
+            (selectedPreset
+              ? t("mail.setup.setupProvider", {
+                  provider: selectedPreset.displayName,
+                })
+              : t("mail.setup.manualConfig"))}
+        </h2>
+        {onCancel && (
+          <button
+            type="button"
+            className="ml-auto cursor-pointer text-sm text-fg-muted hover:text-fg-primary"
+            onClick={onCancel}
+          >
+            {t("mail.setup.cancel")}
+          </button>
+        )}
+      </div>
 
-        {/* Steps indicator */}
-        <StepIndicator current={step} />
+      {/* Steps indicator */}
+      <StepIndicator current={step} />
 
-        {/* Content */}
-        <div className="flex-1 overflow-hidden">
-          {step === "provider" && (
-            <ProviderStep
-              onSelectPreset={handleSelectPreset}
-              onSelectCustom={handleSelectCustom}
-            />
-          )}
-          {step === "credentials" && (
-            <CredentialStep
-              form={form}
-              preset={selectedPreset}
-              isCustom={isCustom}
-              onNext={() => setStep("test")}
-            />
-          )}
-          {step === "test" && (
-            <TestStep
-              email={values.email}
-              displayName={values.displayName}
-              password={values.password}
-              provider={selectedPreset?.provider}
-              imapHost={values.imapHost}
-              imapPort={values.imapPort}
-              imapSecurity={values.imapSecurity}
-              smtpHost={values.smtpHost}
-              smtpPort={values.smtpPort}
-              smtpSecurity={values.smtpSecurity}
-              smtpUsername={values.useSeparateSmtp ? values.smtpUsername : ""}
-              smtpPassword={values.useSeparateSmtp ? values.smtpPassword : ""}
-              onComplete={onComplete}
-              onBack={handleBack}
-            />
-          )}
-        </div>
+      {/* Content */}
+      <div className="flex-1 overflow-hidden">
+        {step === "provider" && (
+          <ProviderStep
+            onSelectPreset={handleSelectPreset}
+            onSelectCustom={handleSelectCustom}
+          />
+        )}
+        {step === "credentials" && (
+          <CredentialStep
+            form={form}
+            preset={selectedPreset}
+            isCustom={isCustom}
+            submitState={submitState}
+            errorMsg={errorMsg}
+            onSubmit={handleSubmit}
+            onRetry={() => {
+              setSubmitState("idle");
+              handleSubmit();
+            }}
+          />
+        )}
       </div>
     </div>
   );
@@ -178,7 +207,6 @@ function StepIndicator({ current }: { current: Step }) {
   const steps: { key: Step; label: string }[] = [
     { key: "provider", label: t("mail.setup.provider") },
     { key: "credentials", label: t("mail.setup.credentials") },
-    { key: "test", label: t("mail.setup.connect") },
   ];
   const currentIdx = steps.findIndex((s) => s.key === current);
 
@@ -277,24 +305,24 @@ function CredentialStep({
   form,
   preset,
   isCustom,
-  onNext,
+  submitState,
+  errorMsg,
+  onSubmit,
+  onRetry,
 }: {
   form: FormInstance;
   preset: MailProviderPresetOutput | null;
   isCustom: boolean;
-  onNext: () => void;
+  submitState: SubmitState;
+  errorMsg: string;
+  onSubmit: () => void;
+  onRetry: () => void;
 }) {
   const { t } = useTranslation();
   const useSeparateSmtp = Form.useWatch<boolean>("useSeparateSmtp", form);
 
-  const handleNext = async () => {
-    try {
-      await form.validateFields();
-      onNext();
-    } catch {
-      // validation errors shown inline
-    }
-  };
+  const isLoading = submitState === "loading";
+  const isError = submitState === "error";
 
   return (
     <ScrollArea direction="vertical" className="h-full">
@@ -424,157 +452,34 @@ function CredentialStep({
           </div>
         )}
 
-        <div className="flex justify-end pt-2">
-          <Button className="cursor-pointer" onClick={handleNext}>
-            {t("mail.setup.testConnection")}
-            <ArrowRight className="ml-2 size-4" />
+        {/* Result messages */}
+        {isError && (
+          <div className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+            <XCircle className="mt-0.5 size-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          {isError && (
+            <Button
+              variant="default"
+              className="cursor-pointer"
+              onClick={onRetry}
+            >
+              {t("mail.setup.retry")}
+            </Button>
+          )}
+          <Button
+            className="cursor-pointer"
+            loading={isLoading}
+            onClick={onSubmit}
+          >
+            {t("mail.setup.addAccountBtn")}
+            {!isLoading && <ArrowRight className="ml-2 size-4" />}
           </Button>
         </div>
       </Form>
     </ScrollArea>
-  );
-}
-
-// ── Test step ────────────────────────────────────────────────────────────────
-
-function TestStep({
-  email,
-  displayName,
-  password,
-  provider,
-  imapHost,
-  imapPort,
-  imapSecurity,
-  smtpHost,
-  smtpPort,
-  smtpSecurity,
-  smtpUsername,
-  smtpPassword,
-  onComplete,
-  onBack,
-}: {
-  email: string;
-  displayName: string;
-  password: string;
-  provider?: string;
-  imapHost: string;
-  imapPort: string;
-  imapSecurity: string;
-  smtpHost: string;
-  smtpPort: string;
-  smtpSecurity: string;
-  smtpUsername: string;
-  smtpPassword: string;
-  onComplete: () => void;
-  onBack: () => void;
-}) {
-  const msg = useMessage();
-  const { t } = useTranslation();
-  const qc = useQueryClient();
-
-  const createAccount = api.mail.createAccount.useMutation({
-    onSuccess: () => {
-      msg.success(t("mail.setup.accountAdded"));
-      // Invalidate accounts list so sidebar picks it up.
-      api.mail.listAccounts.invalidate(qc);
-      onComplete();
-    },
-    onError: (err) => {
-      msg.error(t("mail.setup.createFailed", { error: err.message }));
-    },
-  });
-
-  const handleCreate = () => {
-    createAccount.mutate({
-      display_name: displayName || email,
-      email,
-      provider,
-      imap_host: imapHost,
-      imap_port: imapPort ? Number.parseInt(imapPort, 10) : undefined,
-      imap_security: imapSecurity,
-      imap_username: email,
-      imap_password: password,
-      smtp_host: smtpHost,
-      smtp_port: smtpPort ? Number.parseInt(smtpPort, 10) : undefined,
-      smtp_security: smtpSecurity,
-      smtp_username: smtpUsername || email,
-      smtp_password: smtpPassword || password,
-    });
-  };
-
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
-      {createAccount.isPending && (
-        <>
-          <Spin className="size-8 text-accent" />
-          <p className="text-sm text-fg-muted">
-            {t("mail.setup.creatingAccount")}
-          </p>
-        </>
-      )}
-
-      {createAccount.isSuccess && (
-        <>
-          <CheckCircle2 className="size-10 text-accent" />
-          <p className="text-sm font-medium text-fg-primary">
-            {t("mail.setup.accountSuccess")}
-          </p>
-          <p className="text-sm text-fg-muted">
-            {t("mail.setup.syncingBackground")}
-          </p>
-        </>
-      )}
-
-      {createAccount.isError && (
-        <>
-          <XCircle className="size-10 text-red-500" />
-          <p className="text-sm font-medium text-fg-primary">
-            {t("mail.setup.connectionFailed")}
-          </p>
-          <p className="max-w-md text-center text-sm text-fg-muted">
-            {createAccount.error?.message || "Unknown error"}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="default"
-              className="cursor-pointer"
-              onClick={onBack}
-            >
-              <ArrowLeft className="mr-2 size-4" />
-              {t("mail.setup.goBack")}
-            </Button>
-            <Button className="cursor-pointer" onClick={handleCreate}>
-              {t("mail.setup.retry")}
-            </Button>
-          </div>
-        </>
-      )}
-
-      {createAccount.isIdle && (
-        <>
-          <Mail className="size-10 text-accent" />
-          <p className="text-sm text-fg-muted">
-            {t("mail.setup.readyToAdd", {
-              email,
-              interpolation: { escapeValue: false },
-            })}
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="default"
-              className="cursor-pointer"
-              onClick={onBack}
-            >
-              <ArrowLeft className="mr-2 size-4" />
-              {t("mail.setup.back")}
-            </Button>
-            <Button className="cursor-pointer" onClick={handleCreate}>
-              <Check className="mr-2 size-4" />
-              {t("mail.setup.addAccountBtn")}
-            </Button>
-          </div>
-        </>
-      )}
-    </div>
   );
 }
