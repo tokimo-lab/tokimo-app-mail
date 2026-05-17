@@ -6,6 +6,7 @@
 
 import { useWindowActions } from "@/system";
 import type { WindowState } from "@/system/window/window-types";
+import { emitPick } from "@/system/window-bridge";
 import { AccountSetup } from "./AccountSetup";
 
 export default function AccountSetupWindow({ win }: { win: WindowState }) {
@@ -13,7 +14,10 @@ export default function AccountSetupWindow({ win }: { win: WindowState }) {
 
   return (
     <AccountSetup
-      onComplete={() => closeWindow(win.id)}
+      onComplete={(id) => {
+        emitPick(win, { id });
+        closeWindow(win.id);
+      }}
       onCancel={() => closeWindow(win.id)}
     />
   );

@@ -11,6 +11,7 @@ import { useWindowActions, useWindowId } from "@/system";
 import { useMessage } from "@/system/notifications/useMessage";
 import { useWindowNav } from "@/system/window/WindowNavContext";
 import type { TaskMetadata } from "@/system/window/window-types";
+import { PickCancelled, pickWithBridge } from "@/system/window-bridge";
 import { AccountEditDialog } from "../components/AccountEditDialog";
 import { MailList } from "../components/MailList";
 import { MailSidebar } from "../components/MailSidebar";
@@ -167,17 +168,27 @@ export default function MailApp() {
     [t, deleteAccountMutation],
   );
 
-  const handleAddAccount = useCallback(() => {
-    openModalWindow({
-      component: () => import("../components/AccountSetupWindow"),
-      parentWindowId: windowId,
-      title: t("mail.setup.addAccount"),
-      width: 640,
-      height: 600,
-      noResize: true,
-      noMinimize: true,
-    });
-  }, [openModalWindow, windowId, t]);
+  const handleAddAccount = useCallback(async () => {
+    try {
+      const created = await pickWithBridge<{ id: string }>(openModalWindow, {
+        component: () => import("../components/AccountSetupWindow"),
+        parentWindowId: windowId,
+        title: t("mail.setup.addAccount"),
+        width: 640,
+        height: 600,
+        noResize: true,
+        noMinimize: true,
+      });
+      updateMetadata({
+        mailAccountId: created.id,
+        mailFolderId: undefined,
+        mailMessageId: undefined,
+      } as Partial<TaskMetadata>);
+    } catch (err) {
+      if (err instanceof PickCancelled) return;
+      throw err;
+    }
+  }, [openModalWindow, windowId, t, updateMetadata]);
 
   if (accountsLoading) {
     return (
@@ -205,7 +216,9 @@ export default function MailApp() {
         }))}
         actionLabel={t("common.setupGuide.mailAction")}
         actionIcon={Plus}
-        onAction={handleAddAccount}
+        onAction={() => {
+          void handleAddAccount();
+        }}
       />
     );
   }
@@ -220,7 +233,9 @@ export default function MailApp() {
           collapsed={sidebarCollapsed}
           onSelectAccount={handleSelectAccount}
           onSelectFolder={handleSelectFolder}
-          onAddAccount={handleAddAccount}
+          onAddAccount={() => {
+            void handleAddAccount();
+          }}
           onCompose={handleCompose}
           onToggleCollapse={onToggleCollapse}
           onEditAccount={handleEditAccount}

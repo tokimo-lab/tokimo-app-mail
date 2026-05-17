@@ -34,7 +34,7 @@ const SECURITY_OPTIONS = [
 ];
 
 interface AccountSetupProps {
-  onComplete: () => void;
+  onComplete: (createdId: string) => void;
   onCancel?: () => void;
 }
 
@@ -69,9 +69,9 @@ export function AccountSetup({ onComplete, onCancel }: AccountSetupProps) {
   const [errorMsg, setErrorMsg] = useState("");
 
   const createAccount = api.mail.createAccount.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       api.mail.listAccounts.invalidate(qc);
-      onComplete();
+      onComplete(data.id);
     },
     onError: (err) => {
       setSubmitState("error");
