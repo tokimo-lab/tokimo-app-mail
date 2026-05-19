@@ -45,8 +45,8 @@ pub struct Model {
     pub is_flagged: bool,
     pub has_attachments: bool,
     pub size: i32,
-    pub body_fetched: bool,
     pub created_at: DateTimeWithTimeZone,
+    pub body_fetched: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
