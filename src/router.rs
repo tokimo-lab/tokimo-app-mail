@@ -31,10 +31,6 @@ pub fn build_mail_app_routes() -> Router<Arc<AppState>> {
             "/api/apps/mail/accounts/{id}/test",
             post(handlers::accounts::test_connection),
         )
-        .route(
-            "/api/apps/mail/accounts/{id}/sync",
-            post(handlers::accounts::trigger_sync),
-        )
         // ── Folders ──
         .route(
             "/api/apps/mail/accounts/{account_id}/folders",

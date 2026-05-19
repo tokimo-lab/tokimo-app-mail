@@ -222,10 +222,6 @@ export const mailApi = {
     method: "POST",
     pathFn: (id) => `/api/apps/mail/accounts/${encodeURIComponent(id)}/test`,
   }),
-  triggerSync: createPathMutation<string, void>({
-    method: "POST",
-    pathFn: (id) => `/api/apps/mail/accounts/${encodeURIComponent(id)}/sync`,
-  }),
 
   // ── Folders ──
   listFolders: createQuery<{ accountId: string }, MailFolderOutput[]>({

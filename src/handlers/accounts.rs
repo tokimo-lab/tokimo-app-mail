@@ -244,26 +244,3 @@ pub async fn test_connection(
     services::accounts::test_connection(&state.db, uid, account_id).await?;
     Ok(ok(()))
 }
-
-/// POST /api/apps/mail/accounts/:id/sync — kick off a background sync and return immediately.
-pub async fn trigger_sync(
-    State(state): State<Arc<AppState>>,
-    AuthUser(user): AuthUser,
-    Path(id): Path<String>,
-) -> Result<Json<ApiResponse<()>>, AppError> {
-    let uid: Uuid = user
-        .user_id
-        .parse()
-        .map_err(|_| AppError::BadRequest("invalid user id".into()))?;
-    let account_id: Uuid = id
-        .parse()
-        .map_err(|_| AppError::BadRequest("invalid account id".into()))?;
-    let db = state.db.clone();
-    let event_tx = state.event_tx.clone();
-    tokio::spawn(async move {
-        if let Err(e) = services::sync::sync_account(&db, uid, account_id, Some(&event_tx)).await {
-            tracing::warn!("Background mail sync failed for account {account_id}: {e}");
-        }
-    });
-    Ok(ok(()))
-}
