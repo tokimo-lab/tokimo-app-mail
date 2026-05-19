@@ -3,6 +3,7 @@ import {
   Form,
   Input,
   ScrollArea,
+  Select,
   Spin,
   TextArea,
   useForm,
@@ -13,6 +14,12 @@ import { useTranslation } from "react-i18next";
 import { api } from "@/generated/rust-api";
 import type { MailMessageFullOutput } from "@/generated/rust-api/mail";
 import { useMessage } from "@/system/notifications/useMessage";
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
 
 export interface MailAccountBrief {
   id: string;
@@ -173,17 +180,16 @@ export function MailComposer({
             {/* From selector — only shown when multiple accounts */}
             {accounts.length > 1 && (
               <Form.Item label={t("mail.composer.from")} name="from">
-                <select
-                  className="w-full cursor-pointer rounded border border-border-base bg-bg-base px-2 py-1 text-sm text-fg-primary"
+                <Select
                   value={fromAccountId}
-                  onChange={(e) => setFromAccountId(e.target.value)}
-                >
-                  {accounts.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.displayName} &lt;{a.email}&gt;
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => setFromAccountId(v as string)}
+                  options={accounts.map((a) => ({
+                    value: a.id,
+                    label: a.displayName
+                      ? `${a.displayName} <${a.email}>`
+                      : a.email,
+                  }))}
+                />
               </Form.Item>
             )}
             <div className="flex items-center gap-2">
@@ -232,37 +238,36 @@ export function MailComposer({
                 className="min-h-[300px] resize-none"
               />
             </Form.Item>
-
-            {/* Attachment list */}
-            {attachments.length > 0 && (
-              <div className="mt-2 flex flex-col gap-1">
-                {attachments.map((file, i) => (
-                  <div
-                    key={`${file.name}-${file.size}`}
-                    className="flex items-center gap-2 rounded bg-bg-subtle px-2 py-1 text-xs text-fg-muted"
-                  >
-                    <Paperclip className="size-3 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                    <button
-                      type="button"
-                      className="cursor-pointer text-fg-muted hover:text-fg-primary"
-                      onClick={() => {
-                        const idx = i;
-                        setAttachments((prev) =>
-                          prev.filter((_, j) => j !== idx),
-                        );
-                      }}
-                      aria-label={t("mail.composer.removeAttachment")}
-                    >
-                      <X className="size-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </Form>
         </div>
       </ScrollArea>
+
+      {/* Attachment chips — always visible above footer */}
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-2 border-t border-border-base px-4 py-2 max-h-[120px] overflow-y-auto">
+          {attachments.map((file, i) => (
+            <div
+              key={`${file.name}-${file.size}`}
+              className="inline-flex items-center gap-1.5 rounded-full bg-bg-subtle px-3 py-1 text-xs text-fg-primary"
+            >
+              <Paperclip className="size-3 shrink-0" />
+              <span className="max-w-[180px] truncate">{file.name}</span>
+              <span className="text-fg-muted">{formatBytes(file.size)}</span>
+              <button
+                type="button"
+                className="cursor-pointer text-fg-muted hover:text-fg-primary"
+                onClick={() => {
+                  const idx = i;
+                  setAttachments((prev) => prev.filter((_, j) => j !== idx));
+                }}
+                aria-label={t("mail.composer.removeAttachment")}
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Footer */}
       <div className="flex items-center gap-2 border-t border-border-base px-4 py-3">
@@ -280,11 +285,16 @@ export function MailComposer({
         </Button>
         <button
           type="button"
-          className="cursor-pointer text-fg-muted hover:text-fg-primary"
+          className="relative cursor-pointer text-fg-muted hover:text-fg-primary"
           onClick={() => fileInputRef.current?.click()}
           title={t("mail.composer.addAttachment")}
         >
           <Paperclip className="size-4" />
+          {attachments.length > 0 && (
+            <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-fg-primary text-[10px] font-semibold text-bg-base">
+              {attachments.length}
+            </span>
+          )}
         </button>
         <input
           ref={fileInputRef}
