@@ -7,8 +7,8 @@ import {
   TextArea,
   useForm,
 } from "@tokimo/ui";
-import { Send } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Paperclip, Send, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "@/generated/rust-api";
 import type { MailMessageFullOutput } from "@/generated/rust-api/mail";
@@ -29,6 +29,11 @@ export function MailComposer({
   const { t } = useTranslation();
   const [form] = useForm();
   const [showCcBcc, setShowCcBcc] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const MAX_FILE_BYTES = 25 * 1024 * 1024;
+  const MAX_TOTAL_BYTES = 50 * 1024 * 1024;
 
   // If replying, load the original message.
   const { data: replyData } = api.mail.getMessage.useQuery(
@@ -62,6 +67,24 @@ export function MailComposer({
     },
   });
 
+  const handleAddAttachments = (files: FileList | null) => {
+    if (!files) return;
+    const next = [...attachments, ...Array.from(files)];
+    const totalBytes = next.reduce((sum, f) => sum + f.size, 0);
+    const oversized = next.find((f) => f.size > MAX_FILE_BYTES);
+    if (oversized) {
+      msg.error(
+        t("mail.composer.attachmentTooLarge", { name: oversized.name }),
+      );
+      return;
+    }
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      msg.error(t("mail.composer.attachmentsTooLarge"));
+      return;
+    }
+    setAttachments(next);
+  };
+
   const handleSend = async () => {
     const values = form.getFieldsValue();
     const toAddrs = (values.to || "")
@@ -84,13 +107,16 @@ export function MailComposer({
 
     sendMutation.mutate({
       accountId,
-      to: toAddrs,
-      cc: ccAddrs.length > 0 ? ccAddrs : undefined,
-      bcc: bccAddrs.length > 0 ? bccAddrs : undefined,
-      subject: values.subject || "",
-      text_body: values.body || "",
-      in_reply_to: replyMessage?.messageId ?? undefined,
-      references: replyMessage?.references ?? undefined,
+      payload: {
+        to: toAddrs,
+        cc: ccAddrs.length > 0 ? ccAddrs : undefined,
+        bcc: bccAddrs.length > 0 ? bccAddrs : undefined,
+        subject: values.subject || "",
+        text_body: values.body || "",
+        in_reply_to: replyMessage?.messageId ?? undefined,
+        references: replyMessage?.references ?? undefined,
+      },
+      attachments,
     });
   };
 
@@ -145,6 +171,34 @@ export function MailComposer({
                 className="min-h-[300px] resize-none"
               />
             </Form.Item>
+
+            {/* Attachment list */}
+            {attachments.length > 0 && (
+              <div className="mt-2 flex flex-col gap-1">
+                {attachments.map((file, i) => (
+                  <div
+                    key={`${file.name}-${file.size}`}
+                    className="flex items-center gap-2 rounded bg-bg-subtle px-2 py-1 text-xs text-fg-muted"
+                  >
+                    <Paperclip className="size-3 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                    <button
+                      type="button"
+                      className="cursor-pointer text-fg-muted hover:text-fg-primary"
+                      onClick={() => {
+                        const idx = i;
+                        setAttachments((prev) =>
+                          prev.filter((_, j) => j !== idx),
+                        );
+                      }}
+                      aria-label={t("mail.composer.removeAttachment")}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </Form>
         </div>
       </ScrollArea>
@@ -163,6 +217,21 @@ export function MailComposer({
           )}
           {t("mail.composer.send")}
         </Button>
+        <button
+          type="button"
+          className="cursor-pointer text-fg-muted hover:text-fg-primary"
+          onClick={() => fileInputRef.current?.click()}
+          title={t("mail.composer.addAttachment")}
+        >
+          <Paperclip className="size-4" />
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => handleAddAttachments(e.target.files)}
+        />
       </div>
     </div>
   );

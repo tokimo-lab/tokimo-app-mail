@@ -221,6 +221,7 @@ pub async fn send_message(
     user_id: Uuid,
     account_id: Uuid,
     body: SendMessageBody,
+    attachments: Vec<tokimo_mail::message::ComposeAttachment>,
 ) -> Result<(), AppError> {
     let account = repos::accounts::find_by_id_and_user(db, account_id, user_id)
         .await?
@@ -238,7 +239,7 @@ pub async fn send_message(
         html_body: body.html_body,
         in_reply_to: body.in_reply_to,
         references: body.references.unwrap_or_default(),
-        attachments: vec![],
+        attachments,
     };
 
     client

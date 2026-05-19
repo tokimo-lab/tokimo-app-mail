@@ -18,6 +18,12 @@ export default {
     recipientRequired: "宛先を入力してください",
     messageSent: "メッセージを送信しました",
     sendFailed: "送信に失敗しました：{{error}}",
+    attachments: "添付ファイル",
+    addAttachment: "添付ファイルを追加",
+    removeAttachment: "添付ファイルを削除",
+    attachmentTooLarge: "添付ファイル「{{name}}」は 25 MB の上限を超えています",
+    attachmentsTooLarge:
+      "添付ファイルの合計サイズが 50 MB の上限を超えています",
   },
   // ── Sidebar ──
   sidebar: {

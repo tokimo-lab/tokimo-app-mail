@@ -1,4 +1,5 @@
-use axum::extract::{Json, Path, Query, State};
+use axum::extract::{Json, Multipart, Path, Query, State};
+use base64::{Engine as _, engine::general_purpose};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use ts_rs::TS;
@@ -243,12 +244,15 @@ pub async fn move_messages(
     Ok(ok(()))
 }
 
-/// POST /api/apps/mail/accounts/:account_id/send
+/// POST /api/apps/mail/accounts/:account_id/send  (multipart/form-data)
+/// Fields:
+///   payload    – JSON-encoded SendMessageBody
+///   attachments – zero or more binary file fields (filename from Content-Disposition)
 pub async fn send_message(
     State(state): State<Arc<AppState>>,
     AuthUser(user): AuthUser,
     Path(account_id): Path<String>,
-    Json(body): Json<SendMessageBody>,
+    mut multipart: Multipart,
 ) -> Result<Json<ApiResponse<()>>, AppError> {
     let uid: Uuid = user
         .user_id
@@ -257,7 +261,58 @@ pub async fn send_message(
     let aid: Uuid = account_id
         .parse()
         .map_err(|_| AppError::BadRequest("invalid account id".into()))?;
-    services::messages::send_message(&state.db, uid, aid, body).await?;
+
+    const MAX_FILE_BYTES: usize = 25 * 1024 * 1024; // 25 MB per file
+    const MAX_TOTAL_BYTES: usize = 50 * 1024 * 1024; // 50 MB total
+
+    let mut body: Option<SendMessageBody> = None;
+    let mut attachments: Vec<tokimo_mail::message::ComposeAttachment> = Vec::new();
+    let mut total_bytes: usize = 0;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("multipart error: {e}")))?
+    {
+        match field.name() {
+            Some("payload") => {
+                let text = field
+                    .text()
+                    .await
+                    .map_err(|e| AppError::BadRequest(format!("payload read error: {e}")))?;
+                body = Some(
+                    serde_json::from_str::<SendMessageBody>(&text)
+                        .map_err(|e| AppError::BadRequest(format!("invalid payload JSON: {e}")))?,
+                );
+            }
+            Some("attachments") => {
+                let filename = field.file_name().unwrap_or("attachment").to_string();
+                let content_type = field.content_type().unwrap_or("application/octet-stream").to_string();
+                let data = field
+                    .bytes()
+                    .await
+                    .map_err(|e| AppError::BadRequest(format!("attachment read error: {e}")))?;
+                if data.len() > MAX_FILE_BYTES {
+                    return Err(AppError::BadRequest(format!(
+                        "attachment '{filename}' exceeds 25 MB limit"
+                    )));
+                }
+                total_bytes += data.len();
+                if total_bytes > MAX_TOTAL_BYTES {
+                    return Err(AppError::BadRequest("total attachment size exceeds 50 MB limit".into()));
+                }
+                attachments.push(tokimo_mail::message::ComposeAttachment {
+                    filename,
+                    content_type,
+                    data: general_purpose::STANDARD.encode(&data),
+                });
+            }
+            _ => {}
+        }
+    }
+
+    let body = body.ok_or_else(|| AppError::BadRequest("missing 'payload' field".into()))?;
+    services::messages::send_message(&state.db, uid, aid, body, attachments).await?;
     Ok(ok(()))
 }
 

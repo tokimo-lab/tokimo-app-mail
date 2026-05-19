@@ -1,4 +1,5 @@
 use axum::Router;
+use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
 use std::sync::Arc;
 
@@ -72,7 +73,8 @@ pub fn build_mail_app_routes() -> Router<Arc<AppState>> {
         // ── Send ──
         .route(
             "/api/apps/mail/accounts/{account_id}/send",
-            post(handlers::messages::send_message),
+            post(handlers::messages::send_message)
+                .layer(DefaultBodyLimit::disable()),
         )
         // ── Search ──
         .route(

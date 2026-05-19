@@ -18,6 +18,11 @@ export default {
     recipientRequired: "Please enter at least one recipient",
     messageSent: "Message sent",
     sendFailed: "Failed to send: {{error}}",
+    attachments: "Attachments",
+    addAttachment: "Add attachment",
+    removeAttachment: "Remove attachment",
+    attachmentTooLarge: 'Attachment "{{name}}" exceeds the 25 MB limit',
+    attachmentsTooLarge: "Total attachment size exceeds the 50 MB limit",
   },
   // ── Sidebar ──
   sidebar: {

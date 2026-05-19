@@ -18,6 +18,11 @@ export default {
     recipientRequired: "请输入至少一个收件人",
     messageSent: "邮件已发送",
     sendFailed: "发送失败：{{error}}",
+    attachments: "附件",
+    addAttachment: "添加附件",
+    removeAttachment: "移除附件",
+    attachmentTooLarge: '附件"{{name}}"超过 25 MB 限制',
+    attachmentsTooLarge: "附件总大小超过 50 MB 限制",
   },
   // ── Sidebar ──
   sidebar: {

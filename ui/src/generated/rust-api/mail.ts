@@ -1,7 +1,10 @@
+import { type UseMutationOptions, useMutation } from "@tanstack/react-query";
+import { authFetch } from "../../lib/auth-fetch";
 import {
   createMutation,
   createPathMutation,
   createQuery,
+  rustUrl,
 } from "../../lib/rust-api-runtime";
 
 // ── Output types (mirrors Rust DTOs — will be auto-generated after `make gen:api`) ──
@@ -164,6 +167,12 @@ export interface SendMessageInput {
   references?: string[];
 }
 
+export interface SendMessageApiInput {
+  accountId: string;
+  payload: Omit<SendMessageInput, "accountId">;
+  attachments?: File[];
+}
+
 interface BulkMessageIdsInput {
   message_ids: string[];
 }
@@ -268,15 +277,37 @@ export const mailApi = {
     path: "/api/apps/mail/messages/move",
   }),
 
-  // ── Send ──
-  sendMessage: createMutation<SendMessageInput, void>({
-    path: "/api/apps/mail/accounts",
-    pathFn: (input) => `/api/apps/mail/accounts/${input.accountId}/send`,
-    bodyFn: (input) => {
-      const { accountId: _, ...body } = input;
-      return body;
-    },
-  }),
+  // ── Send (multipart/form-data to support attachments) ──
+  sendMessage: (() => {
+    const mutationFn = async (input: SendMessageApiInput): Promise<void> => {
+      const fd = new FormData();
+      fd.append("payload", JSON.stringify(input.payload));
+      for (const file of input.attachments ?? []) {
+        fd.append("attachments", file, file.name);
+      }
+      const res = await authFetch(
+        rustUrl(
+          `/api/apps/mail/accounts/${encodeURIComponent(input.accountId)}/send`,
+        ),
+        { method: "POST", body: fd },
+      );
+      if (!res.ok) {
+        const text = await res.text().catch(() => "Unknown error");
+        throw new Error(text);
+      }
+    };
+    return {
+      useMutation: (
+        opts?: Partial<UseMutationOptions<void, Error, SendMessageApiInput>>,
+      ) =>
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        useMutation<void, Error, SendMessageApiInput>({
+          mutationFn,
+          ...opts,
+        }),
+      mutate: mutationFn,
+    };
+  })(),
 
   // ── Search ──
   searchMessages: createQuery<SearchInput, MailMessageListOutput>({
