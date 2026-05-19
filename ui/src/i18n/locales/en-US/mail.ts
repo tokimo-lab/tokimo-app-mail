@@ -3,6 +3,7 @@ export default {
   composer: {
     newMessage: "New Message",
     reply: "Reply",
+    forward: "Forward",
     send: "Send",
     to: "To",
     cc: "Cc",
@@ -24,6 +25,10 @@ export default {
     removeAttachment: "Remove attachment",
     attachmentTooLarge: 'Attachment "{{name}}" exceeds the 25 MB limit',
     attachmentsTooLarge: "Total attachment size exceeds the 50 MB limit",
+    replyQuotedHeader: "On {{date}}, {{from}} wrote:",
+    forwardSeparator: "--- Forwarded Message ---",
+    subjectReplyPrefix: "Re:",
+    subjectForwardPrefix: "Fwd:",
   },
   // ── Sidebar ──
   sidebar: {

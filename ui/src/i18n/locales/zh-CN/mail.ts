@@ -3,6 +3,7 @@ export default {
   composer: {
     newMessage: "新邮件",
     reply: "回复",
+    forward: "转发",
     send: "发送",
     to: "收件人",
     cc: "抄送",
@@ -24,6 +25,10 @@ export default {
     removeAttachment: "移除附件",
     attachmentTooLarge: '附件"{{name}}"超过 25 MB 限制',
     attachmentsTooLarge: "附件总大小超过 50 MB 限制",
+    replyQuotedHeader: "{{from}} 于 {{date}} 写道：",
+    forwardSeparator: "--- 转发邮件 ---",
+    subjectReplyPrefix: "Re:",
+    subjectForwardPrefix: "Fwd:",
   },
   // ── Sidebar ──
   sidebar: {

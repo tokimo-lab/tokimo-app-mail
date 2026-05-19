@@ -137,6 +137,33 @@ export default function MailApp() {
         metadata: {
           accountId: activeAccountId,
           replyToMessageId: messageId,
+          mode: "reply",
+          accounts: accounts.map((a) => ({
+            id: a.id,
+            email: a.email,
+            displayName: a.displayName,
+          })),
+        } as Record<string, unknown> as TaskMetadata,
+      });
+    },
+    [activeAccountId, accounts, openModalWindow, windowId, t],
+  );
+
+  const handleForward = useCallback(
+    (messageId: string) => {
+      if (!activeAccountId) return;
+      openModalWindow({
+        component: () => import("../components/MailComposerWindow"),
+        parentWindowId: windowId,
+        title: t("mail.composer.forward"),
+        width: 700,
+        height: 560,
+        noResize: true,
+        noMinimize: true,
+        metadata: {
+          accountId: activeAccountId,
+          replyToMessageId: messageId,
+          mode: "forward",
           accounts: accounts.map((a) => ({
             id: a.id,
             email: a.email,
@@ -294,7 +321,7 @@ export default function MailApp() {
           <MailViewer
             messageId={selectedMessageId}
             onReply={handleReply}
-            onForward={handleReply}
+            onForward={handleForward}
             onDelete={handleDeleteMessage}
             onClose={() =>
               updateMetadata({

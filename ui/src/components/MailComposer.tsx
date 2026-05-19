@@ -24,6 +24,7 @@ interface MailComposerProps {
   accountId: string;
   accounts?: MailAccountBrief[];
   replyToMessageId?: string | null;
+  mode?: "reply" | "forward";
   onClose: () => void;
 }
 
@@ -31,6 +32,7 @@ export function MailComposer({
   accountId,
   accounts = [],
   replyToMessageId,
+  mode,
   onClose,
 }: MailComposerProps) {
   const msg = useMessage();
@@ -51,20 +53,54 @@ export function MailComposer({
   );
   const replyMessage = replyData as MailMessageFullOutput | undefined;
 
-  // Pre-fill reply fields.
-  const isReply = !!replyToMessageId && !!replyMessage;
+  // Pre-fill reply / forward fields.
+  const hasOriginalMessage = !!replyToMessageId && !!replyMessage;
   useEffect(() => {
-    if (!isReply || !replyMessage) return;
-    const replyAddr =
-      replyMessage.replyTo.length > 0
-        ? replyMessage.replyTo
-        : replyMessage.from;
+    if (!hasOriginalMessage || !replyMessage) return;
     const sub = replyMessage.subject || "";
-    form.setFieldsValue({
-      to: replyAddr.map((a) => a.address).join(", "),
-      subject: sub.startsWith("Re:") ? sub : `Re: ${sub}`,
-    });
-  }, [isReply, replyMessage, form]);
+    const fromAddr = replyMessage.from.map((a) => a.address).join(", ");
+    const dateStr = replyMessage.date
+      ? new Date(replyMessage.date).toLocaleString()
+      : "";
+    const originalBody = replyMessage.textBody || "";
+
+    if (mode === "forward") {
+      const fwdPrefix = t("mail.composer.subjectForwardPrefix");
+      const fwdSub = sub.startsWith(fwdPrefix) ? sub : `${fwdPrefix} ${sub}`;
+      const separator = t("mail.composer.forwardSeparator");
+      const forwardedBody = [
+        "",
+        "",
+        separator,
+        `From: ${fromAddr}`,
+        ...(dateStr ? [`Date: ${dateStr}`] : []),
+        `Subject: ${sub}`,
+        "",
+        originalBody,
+      ].join("\n");
+      form.setFieldsValue({ to: "", subject: fwdSub, body: forwardedBody });
+    } else {
+      const replyAddr =
+        replyMessage.replyTo.length > 0
+          ? replyMessage.replyTo
+          : replyMessage.from;
+      const rePrefix = t("mail.composer.subjectReplyPrefix");
+      const replySub = sub.startsWith(rePrefix) ? sub : `${rePrefix} ${sub}`;
+      const quotedHeader = t("mail.composer.replyQuotedHeader", {
+        date: dateStr,
+        from: fromAddr,
+      });
+      const quotedBody = originalBody
+        .split("\n")
+        .map((line) => `> ${line}`)
+        .join("\n");
+      form.setFieldsValue({
+        to: replyAddr.map((a) => a.address).join(", "),
+        subject: replySub,
+        body: `\n\n${quotedHeader}\n${quotedBody}`,
+      });
+    }
+  }, [hasOriginalMessage, replyMessage, form, mode, t]);
 
   const sendMutation = api.mail.sendMessage.useMutation({
     onSuccess: () => {

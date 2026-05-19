@@ -3,6 +3,7 @@ export default {
   composer: {
     newMessage: "新規メッセージ",
     reply: "返信",
+    forward: "転送",
     send: "送信",
     to: "宛先",
     cc: "Cc",
@@ -25,6 +26,10 @@ export default {
     attachmentTooLarge: "添付ファイル「{{name}}」は 25 MB の上限を超えています",
     attachmentsTooLarge:
       "添付ファイルの合計サイズが 50 MB の上限を超えています",
+    replyQuotedHeader: "{{date}} に {{from}} は書きました：",
+    forwardSeparator: "--- 転送メッセージ ---",
+    subjectReplyPrefix: "Re:",
+    subjectForwardPrefix: "Fwd:",
   },
   // ── Sidebar ──
   sidebar: {
