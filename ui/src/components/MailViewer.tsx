@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Button, Empty, ScrollArea, Spin, Tooltip } from "@tokimo/ui";
+import { Button, Empty, Modal, ScrollArea, Spin, Tooltip } from "@tokimo/ui";
 import DOMPurify from "dompurify";
 import {
   ArrowLeft,
@@ -9,6 +9,7 @@ import {
   Paperclip,
   RefreshCw,
   Reply,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
@@ -22,10 +23,18 @@ import { useDateFormat } from "@/system";
 interface MailViewerProps {
   messageId: string;
   onReply: (messageId: string) => void;
+  onForward: (messageId: string) => void;
+  onDelete: (messageId: string) => Promise<void> | void;
   onClose: () => void;
 }
 
-export function MailViewer({ messageId, onReply, onClose }: MailViewerProps) {
+export function MailViewer({
+  messageId,
+  onReply,
+  onForward,
+  onDelete,
+  onClose,
+}: MailViewerProps) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const shadowHostRef = useRef<HTMLDivElement>(null);
@@ -115,13 +124,31 @@ export function MailViewer({ messageId, onReply, onClose }: MailViewerProps) {
             variant="text"
             size="small"
             className="cursor-pointer"
-            onClick={() => onReply(message.id)}
+            onClick={() => onForward(message.id)}
           >
             <Forward className="size-4" />
             <span className="ml-1">{t("mail.viewer.forward")}</span>
           </Button>
         </Tooltip>
         <div className="flex-1" />
+        <Tooltip title={t("mail.viewer.delete")}>
+          <Button
+            variant="text"
+            size="small"
+            className="cursor-pointer text-red-500 hover:text-red-600"
+            onClick={() => {
+              Modal.confirm({
+                title: t("mail.viewer.confirmDeleteTitle"),
+                content: t("mail.viewer.confirmDeleteContent"),
+                okType: "danger",
+                okText: t("mail.viewer.delete"),
+                onOk: () => onDelete(message.id),
+              });
+            }}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        </Tooltip>
       </div>
 
       <ScrollArea className="shrink-0 max-h-[45%]" direction="vertical">

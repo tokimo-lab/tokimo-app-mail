@@ -6,9 +6,8 @@ import {
   type ScrollAreaRef,
   SearchInput,
   Spin,
-  Tooltip,
 } from "@tokimo/ui";
-import { Inbox, Paperclip, Star, Trash2 } from "lucide-react";
+import { Inbox, Paperclip, Star } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "@/generated/rust-api";
@@ -26,7 +25,6 @@ interface MailListProps {
   folderId: string;
   selectedMessageId: string | null;
   onSelectMessage: (id: string) => void;
-  onDeleteMessage: (id: string) => void;
 }
 
 export function MailList({
@@ -34,7 +32,6 @@ export function MailList({
   folderId,
   selectedMessageId,
   onSelectMessage,
-  onDeleteMessage,
 }: MailListProps) {
   const { t } = useTranslation();
   const [page, setPage] = useState(1);
@@ -240,30 +237,6 @@ export function MailList({
     [],
   );
 
-  const deleteMutation = api.mail.deleteMessages.useMutation();
-  const handleDelete = useCallback(
-    (e: React.MouseEvent, id: string) => {
-      e.stopPropagation();
-      // Remove from local list immediately.
-      setAllMessages((prev) => prev.filter((m) => m.id !== id));
-      // Deselect if this message is selected.
-      onDeleteMessage(id);
-      // Delete from DB.
-      deleteMutation.mutate(
-        { message_ids: [id] },
-        {
-          onSuccess: () => {
-            // Invalidate folder queries to update counts.
-            queryClient.invalidateQueries({
-              queryKey: api.mail.listFolders.queryKey({ accountId }),
-            });
-          },
-        },
-      );
-    },
-    [accountId, deleteMutation, onDeleteMessage, queryClient],
-  );
-
   // Decide which messages to show.
   const displayMessages = searchQuery
     ? (searchData?.messages ?? [])
@@ -353,7 +326,6 @@ export function MailList({
               message={msg}
               isSelected={selectedMessageId === msg.id}
               onClick={() => handleSelectMessage(msg.id)}
-              onDelete={(e) => handleDelete(e, msg.id)}
             />
           ))}
         </div>
@@ -373,12 +345,10 @@ function MessageRow({
   message,
   isSelected,
   onClick,
-  onDelete,
 }: {
   message: MailMessageSummaryOutput;
   isSelected: boolean;
   onClick: () => void;
-  onDelete: (e: React.MouseEvent) => void;
 }) {
   const { t } = useTranslation();
   const isUnread = !message.isRead;
@@ -415,18 +385,9 @@ function MessageRow({
         >
           {fromDisplay}
         </span>
-        <span className="ml-auto shrink-0 text-xs text-fg-muted group-hover/msg:hidden">
+        <span className="ml-auto shrink-0 text-xs text-fg-muted">
           {dateStr}
         </span>
-        <Tooltip title={t("mail.viewer.delete")}>
-          <button
-            type="button"
-            onClick={onDelete}
-            className="ml-auto hidden shrink-0 cursor-pointer rounded p-0.5 text-fg-muted hover:text-red-500 group-hover/msg:inline-flex"
-          >
-            <Trash2 className="size-3.5" />
-          </button>
-        </Tooltip>
       </div>
       <div className="flex items-center gap-1">
         <span

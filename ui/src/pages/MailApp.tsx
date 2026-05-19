@@ -94,13 +94,33 @@ export default function MailApp() {
     [updateMetadata],
   );
 
-  const handleDeleteMessage = useCallback(
-    (id: string) => {
+  const deleteMessageMutation = api.mail.deleteMessages.useMutation({
+    onSuccess: (_data, vars) => {
+      const id = vars.message_ids[0];
+      // Deselect if deleted message is currently selected.
       if (selectedMessageId === id) {
         updateMetadata({ mailMessageId: undefined } as Partial<TaskMetadata>);
       }
+      // Invalidate folder counts and message list.
+      if (activeAccountId) {
+        qc.invalidateQueries({
+          queryKey: api.mail.listFolders.queryKey({
+            accountId: activeAccountId,
+          }),
+        });
+      }
+      msg.success(t("mail.viewer.deleteSuccess"));
     },
-    [selectedMessageId, updateMetadata],
+    onError: (err) => {
+      msg.error(t("mail.viewer.deleteFailed", { error: err.message }));
+    },
+  });
+
+  const handleDeleteMessage = useCallback(
+    (id: string) => {
+      deleteMessageMutation.mutate({ message_ids: [id] });
+    },
+    [deleteMessageMutation],
   );
 
   const handleReply = useCallback(
@@ -249,7 +269,6 @@ export default function MailApp() {
             folderId={selectedFolderId}
             selectedMessageId={selectedMessageId}
             onSelectMessage={handleSelectMessage}
-            onDeleteMessage={handleDeleteMessage}
           />
         ) : (
           <div className="flex w-72 shrink-0 items-center justify-center border-r border-border-base">
@@ -265,6 +284,8 @@ export default function MailApp() {
           <MailViewer
             messageId={selectedMessageId}
             onReply={handleReply}
+            onForward={handleReply}
+            onDelete={handleDeleteMessage}
             onClose={() =>
               updateMetadata({
                 mailMessageId: undefined,
