@@ -158,6 +158,26 @@ export function MailSidebar({
     });
   }, [ws, queryClient]);
 
+  useEffect(() => {
+    return ws.subscribe("mail:folder_counts", (msg) => {
+      const data = msg.data as {
+        accountId: string;
+        folders: { folderId: string; unreadCount: number }[];
+      };
+      const key = api.mail.listFolders.queryKey({ accountId: data.accountId });
+      queryClient.setQueryData<MailFolderOutput[]>(key, (old) => {
+        if (!old) return old;
+        const countMap = new Map(
+          data.folders.map((f) => [f.folderId, f.unreadCount]),
+        );
+        return old.map((f) => {
+          const count = countMap.get(f.id);
+          return count !== undefined ? { ...f, unreadCount: count } : f;
+        });
+      });
+    });
+  }, [ws, queryClient]);
+
   const autoSelectedRef = useRef<string | null>(null);
   useEffect(() => {
     if (selectedFolderId || !selectedAccountId) return;

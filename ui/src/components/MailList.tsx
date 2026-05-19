@@ -12,6 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "@/generated/rust-api";
 import type {
+  MailFolderOutput,
   MailMessageListOutput,
   MailMessageSummaryOutput,
 } from "@/generated/rust-api/mail";
@@ -218,16 +219,42 @@ export function MailList({
 
   const handleSelectMessage = useCallback(
     (id: string) => {
+      // Capture unread state before optimistic update.
+      const wasUnread = allMessages.find((m) => m.id === id)?.isRead === false;
       // Update local list immediately (no re-render lag).
       setAllMessages((prev) =>
         prev.map((m) => (m.id === id ? { ...m, isRead: true } : m)),
       );
       markAsReadInCache(id);
-      // Fire-and-forget to server for persistence.
-      markReadMutation.mutate({ message_ids: [id] });
+      // Fire-and-forget to server; on success patch folder unread count.
+      markReadMutation.mutate(
+        { message_ids: [id] },
+        {
+          onSuccess: () => {
+            if (!wasUnread) return;
+            const key = api.mail.listFolders.queryKey({ accountId });
+            queryClient.setQueryData<MailFolderOutput[]>(key, (old) => {
+              if (!old) return old;
+              return old.map((f) =>
+                f.id === folderId
+                  ? { ...f, unreadCount: Math.max(0, f.unreadCount - 1) }
+                  : f,
+              );
+            });
+          },
+        },
+      );
       onSelectMessage(id);
     },
-    [markAsReadInCache, markReadMutation, onSelectMessage],
+    [
+      allMessages,
+      accountId,
+      folderId,
+      markAsReadInCache,
+      markReadMutation,
+      onSelectMessage,
+      queryClient,
+    ],
   );
 
   const handleSearchChange = useCallback(
