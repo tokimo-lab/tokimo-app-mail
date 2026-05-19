@@ -16,7 +16,6 @@ import {
   Inbox,
   Pencil,
   Plus,
-  RefreshCw,
   Send,
   Settings,
   Star,
@@ -133,8 +132,6 @@ export function MailSidebar({
     { enabled: !!selectedAccountId },
   );
   const folders = (folderQuery.data ?? []) as MailFolderOutput[];
-
-  const syncMutation = api.mail.triggerSync.useMutation();
 
   const queryClient = useQueryClient();
   const ws = useWs();
@@ -267,20 +264,6 @@ export function MailSidebar({
       variant: "primary",
       onClick: onCompose,
     },
-    ...(selectedAccountId
-      ? [
-          {
-            key: "sync",
-            icon: (
-              <RefreshCw
-                className={`size-4 ${syncMutation.isPending ? "animate-spin" : ""}`}
-              />
-            ),
-            label: t("mail.sidebar.sync"),
-            onClick: () => syncMutation.mutate(selectedAccountId),
-          },
-        ]
-      : []),
     {
       key: "add-account",
       icon: <Plus className="size-4" />,

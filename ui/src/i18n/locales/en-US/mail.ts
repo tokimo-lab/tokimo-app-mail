@@ -23,7 +23,6 @@ export default {
   sidebar: {
     compose: "Compose",
     addAccount: "Add account",
-    sync: "Sync",
     expandSidebar: "Expand sidebar",
     collapseSidebar: "Collapse sidebar",
     folders: "Folders",

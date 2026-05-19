@@ -23,7 +23,6 @@ export default {
   sidebar: {
     compose: "写邮件",
     addAccount: "添加账户",
-    sync: "同步",
     expandSidebar: "展开侧栏",
     collapseSidebar: "收起侧栏",
     folders: "文件夹",

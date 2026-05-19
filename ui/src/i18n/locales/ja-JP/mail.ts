@@ -23,7 +23,6 @@ export default {
   sidebar: {
     compose: "作成",
     addAccount: "アカウントを追加",
-    sync: "同期",
     expandSidebar: "サイドバーを展開",
     collapseSidebar: "サイドバーを折りたたむ",
     folders: "フォルダ",
