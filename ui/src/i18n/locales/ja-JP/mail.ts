@@ -18,6 +18,7 @@ export default {
     recipientRequired: "宛先を入力してください",
     messageSent: "メッセージを送信しました",
     sendFailed: "送信に失敗しました：{{error}}",
+    from: "差出人",
     attachments: "添付ファイル",
     addAttachment: "添付ファイルを追加",
     removeAttachment: "添付ファイルを削除",

@@ -137,10 +137,15 @@ export default function MailApp() {
         metadata: {
           accountId: activeAccountId,
           replyToMessageId: messageId,
+          accounts: accounts.map((a) => ({
+            id: a.id,
+            email: a.email,
+            displayName: a.displayName,
+          })),
         } as Record<string, unknown> as TaskMetadata,
       });
     },
-    [activeAccountId, openModalWindow, windowId, t],
+    [activeAccountId, accounts, openModalWindow, windowId, t],
   );
 
   const handleCompose = useCallback(() => {
@@ -155,9 +160,14 @@ export default function MailApp() {
       noMinimize: true,
       metadata: {
         accountId: activeAccountId,
+        accounts: accounts.map((a) => ({
+          id: a.id,
+          email: a.email,
+          displayName: a.displayName,
+        })),
       } as Record<string, unknown> as TaskMetadata,
     });
-  }, [activeAccountId, openModalWindow, windowId, t]);
+  }, [activeAccountId, accounts, openModalWindow, windowId, t]);
 
   const deleteAccountMutation = api.mail.deleteAccount.useMutation({
     onSuccess: () => {

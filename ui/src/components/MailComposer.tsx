@@ -14,14 +14,22 @@ import { api } from "@/generated/rust-api";
 import type { MailMessageFullOutput } from "@/generated/rust-api/mail";
 import { useMessage } from "@/system/notifications/useMessage";
 
+export interface MailAccountBrief {
+  id: string;
+  email: string;
+  displayName: string;
+}
+
 interface MailComposerProps {
   accountId: string;
+  accounts?: MailAccountBrief[];
   replyToMessageId?: string | null;
   onClose: () => void;
 }
 
 export function MailComposer({
   accountId,
+  accounts = [],
   replyToMessageId,
   onClose,
 }: MailComposerProps) {
@@ -30,6 +38,7 @@ export function MailComposer({
   const [form] = useForm();
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [fromAccountId, setFromAccountId] = useState(accountId);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -106,7 +115,7 @@ export function MailComposer({
       .filter(Boolean);
 
     sendMutation.mutate({
-      accountId,
+      accountId: fromAccountId,
       payload: {
         to: toAddrs,
         cc: ccAddrs.length > 0 ? ccAddrs : undefined,
@@ -125,6 +134,22 @@ export function MailComposer({
       <ScrollArea className="flex-1" direction="vertical">
         <div className="p-4">
           <Form form={form} layout="horizontal" labelCol={{ span: 1 }}>
+            {/* From selector — only shown when multiple accounts */}
+            {accounts.length > 1 && (
+              <Form.Item label={t("mail.composer.from")} name="from">
+                <select
+                  className="w-full cursor-pointer rounded border border-border-base bg-bg-base px-2 py-1 text-sm text-fg-primary"
+                  value={fromAccountId}
+                  onChange={(e) => setFromAccountId(e.target.value)}
+                >
+                  {accounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.displayName} &lt;{a.email}&gt;
+                    </option>
+                  ))}
+                </select>
+              </Form.Item>
+            )}
             <div className="flex items-center gap-2">
               <Form.Item
                 label={t("mail.composer.to")}

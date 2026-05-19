@@ -18,6 +18,7 @@ export default {
     recipientRequired: "Please enter at least one recipient",
     messageSent: "Message sent",
     sendFailed: "Failed to send: {{error}}",
+    from: "From",
     attachments: "Attachments",
     addAttachment: "Add attachment",
     removeAttachment: "Remove attachment",

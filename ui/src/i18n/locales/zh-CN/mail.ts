@@ -18,6 +18,7 @@ export default {
     recipientRequired: "请输入至少一个收件人",
     messageSent: "邮件已发送",
     sendFailed: "发送失败：{{error}}",
+    from: "发件人",
     attachments: "附件",
     addAttachment: "添加附件",
     removeAttachment: "移除附件",
