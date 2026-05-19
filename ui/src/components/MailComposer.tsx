@@ -285,16 +285,11 @@ export function MailComposer({
         </Button>
         <button
           type="button"
-          className="relative cursor-pointer text-fg-muted hover:text-fg-primary"
+          className="cursor-pointer text-fg-muted hover:text-fg-primary"
           onClick={() => fileInputRef.current?.click()}
           title={t("mail.composer.addAttachment")}
         >
           <Paperclip className="size-4" />
-          {attachments.length > 0 && (
-            <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-fg-primary text-[10px] font-semibold text-bg-base">
-              {attachments.length}
-            </span>
-          )}
         </button>
         <input
           ref={fileInputRef}
