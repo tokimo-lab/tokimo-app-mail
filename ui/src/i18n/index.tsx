@@ -157,6 +157,24 @@ export const enUS = en;
 export const zhCN = zh;
 export const translations = { "en-US": enUS, "zh-CN": zhCN };
 
+function flattenTranslations(
+  map: Record<string, TranslationMap>,
+): Record<string, Record<string, string>> {
+  return Object.fromEntries(
+    Object.entries(map).map(([locale, dict]) => [
+      locale,
+      Object.fromEntries(
+        Object.entries(dict).map(([key, value]) => [
+          key,
+          Array.isArray(value) ? value.join("\n") : value,
+        ]),
+      ),
+    ]),
+  );
+}
+
+export const appTranslations = flattenTranslations(translations);
+
 function interpolate(text: string, options?: TranslationOptions): string {
   if (!options) return text;
   return text.replace(/{{\s*([^}]+)\s*}}/g, (_match, key: string) => {

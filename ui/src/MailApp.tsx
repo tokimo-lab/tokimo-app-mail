@@ -1,9 +1,16 @@
 import { useQueryClient } from "@tanstack/react-query";
 import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { useShellMenuBar } from "@tokimo/sdk/react";
-import { AppSetupGuide, Empty, Modal, Spin } from "@tokimo/ui";
+import { Button, Empty, Modal, Spin } from "@tokimo/ui";
 import { Inbox, Mail, Plus, Send } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ComponentType,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AccountEditDialog } from "./components/AccountEditDialog";
 import { MailList } from "./components/MailList";
 import { MailSidebar } from "./components/MailSidebar";
@@ -12,8 +19,54 @@ import { mailApi } from "./generated/rust-api";
 import type { MailAccountOutput } from "./generated/rust-api/mail";
 import { useMailAccounts } from "./hooks/useMailAccounts";
 import { useTranslation } from "./i18n";
+import { openShellModalWindow } from "./lib/modal-window";
 import { useContainerWidth } from "./lib/use-container-width";
 import { registerBridge } from "./modal-bridge";
+
+interface MailSetupGuideFeature {
+  icon?: ComponentType<{ className?: string }>;
+  label: string;
+}
+
+function MailSetupGuide({
+  title,
+  description,
+  features,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  features: MailSetupGuideFeature[];
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <div className="flex h-full items-center justify-center p-8">
+      <div className="max-w-md rounded-2xl border border-border-base bg-bg-base/80 p-8 text-center shadow-sm">
+        <img src="icon.png" alt="" className="mx-auto mb-5 size-16" />
+        <h1 className="text-xl font-semibold text-text-base">{title}</h1>
+        <p className="mt-2 text-sm text-text-muted">{description}</p>
+        <div className="mt-6 space-y-3 text-left">
+          {features.map(({ icon: Icon, label }) => (
+            <div key={label} className="flex items-center gap-3 text-sm">
+              {Icon ? <Icon className="size-4 text-blue-500" /> : null}
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+        <Button
+          className="mt-7"
+          variant="primary"
+          icon={<Plus className="size-4" />}
+          onClick={onAction}
+        >
+          {actionLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
   const { t } = useTranslation();
@@ -114,7 +167,7 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
           }
         },
       });
-      ctx.shell.openModalWindow({
+      openShellModalWindow(ctx.shell, {
         component: () => import("./components/MailComposerWindow"),
         title:
           options?.mode === "reply"
@@ -156,7 +209,7 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
         void refetchAccounts();
       },
     });
-    ctx.shell.openModalWindow({
+    openShellModalWindow(ctx.shell, {
       component: () => import("./components/AccountSetupWindow"),
       title: t("mail.setup.addAccount"),
       width: 640,
@@ -230,16 +283,13 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
 
   if (accounts.length === 0) {
     return (
-      <AppSetupGuide
-        imageSrc="icon.png"
-        accentColor="blue"
+      <MailSetupGuide
         title={t("common.setupGuide.getStarted", { name: "Mail" })}
         description={t("common.setupGuide.mailTagline")}
         features={t("common.setupGuide.mailFeatures", {
           returnObjects: true,
         }).map((label, i) => ({ icon: [Plus, Inbox, Send][i], label }))}
         actionLabel={t("common.setupGuide.mailAction")}
-        actionIcon={Plus}
         onAction={handleAddAccount}
       />
     );

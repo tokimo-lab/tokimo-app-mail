@@ -37,9 +37,9 @@ const fileOverrides = root
 // Fixed github: refs used as fallback for workspace:* in standalone mode
 const githubRefs = {
   "@tokimo/ui":
-    "github:tokimo-lab/tokimo-ui#67925b8147d21f7d5ac3db50a3601400b144b89d",
+    "github:tokimo-lab/tokimo-ui#ce11e88ab475a7933fe284966dac1f9fd09cca72",
   "@tokimo/sdk":
-    "github:tokimo-lab/tokimo-package-sdk#2632b1b675b012735d54f85fee00b71b7f27e0c4",
+    "github:tokimo-lab/tokimo-package-sdk#9d083444319853b56e83823a0a358fde8c69d506",
   "@tokimo/app-builder":
     "github:tokimo-lab/tokimo-app-builder#2232b1ba4fb9b7d61645c6588c579106bf6821dd",
   "@tokimo/viewers":

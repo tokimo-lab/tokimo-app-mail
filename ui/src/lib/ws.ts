@@ -18,9 +18,16 @@ export function useWs(shell?: ShellApi): { subscribe: SubscribeFn } {
   return useMemo(
     () => ({
       subscribe: (eventType, handler) => {
-        if (shell && hasWs(shell))
-          return shell.ws.subscribe(eventType, handler);
-        return () => undefined;
+        if (!shell) return () => undefined;
+        if (!hasWs(shell)) {
+          console.warn(
+            `[mail] shell.ws is unavailable; skipped subscription for ${eventType}.`,
+          );
+          return () => undefined;
+        }
+        const subscribe = shell.ws?.subscribe;
+        if (!subscribe) return () => undefined;
+        return subscribe(eventType, handler);
       },
     }),
     [shell],

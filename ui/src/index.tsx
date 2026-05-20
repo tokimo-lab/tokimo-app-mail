@@ -1,7 +1,7 @@
 import { type AppRuntimeCtx, type Dispose, defineApp } from "@tokimo/sdk";
 import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { translations } from "./i18n";
+import { appTranslations } from "./i18n";
 import { MailApp } from "./MailApp";
 import "./index.css";
 import { MailProviders } from "./lib/providers";
@@ -18,7 +18,7 @@ export default defineApp({
     defaultSize: { width: 1200, height: 800 },
     category: "system",
   },
-  translations,
+  translations: appTranslations,
   mount(container: HTMLElement, ctx: AppRuntimeCtx): Dispose {
     const root: Root = createRoot(container);
     root.render(

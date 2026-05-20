@@ -1,10 +1,10 @@
-import type { ShellWindowHandle } from "@tokimo/sdk";
 import { useState } from "react";
+import type { AppModalWindowHandle } from "../lib/modal-window";
 import { MailProviders } from "../lib/providers";
 import { clearBridge, getBridge } from "../modal-bridge";
 import { AccountSetup } from "./AccountSetup";
 
-function getBridgeId(win: ShellWindowHandle): string | null {
+function getBridgeId(win: AppModalWindowHandle): string | null {
   const value = win.metadata.bridgeId;
   return typeof value === "string" ? value : null;
 }
@@ -12,7 +12,7 @@ function getBridgeId(win: ShellWindowHandle): string | null {
 export default function AccountSetupWindow({
   win,
 }: {
-  win: ShellWindowHandle;
+  win: AppModalWindowHandle;
 }) {
   const bridgeId = getBridgeId(win);
   const [bridge] = useState(() => (bridgeId ? getBridge(bridgeId) : undefined));

@@ -1,5 +1,5 @@
-import type { ShellWindowHandle } from "@tokimo/sdk";
 import { useState } from "react";
+import type { AppModalWindowHandle } from "../lib/modal-window";
 import { MailProviders } from "../lib/providers";
 import { clearBridge, getBridge } from "../modal-bridge";
 import type { MailAccountBrief } from "./MailComposer";
@@ -38,7 +38,7 @@ function readAccounts(meta: Record<string, unknown>): MailAccountBrief[] {
 export default function MailComposerWindow({
   win,
 }: {
-  win: ShellWindowHandle;
+  win: AppModalWindowHandle;
 }) {
   const meta = win.metadata;
   const bridgeId = readString(meta, "bridgeId");
