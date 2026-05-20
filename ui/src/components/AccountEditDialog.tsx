@@ -13,9 +13,9 @@ import {
   ScrollArea,
   Select,
 } from "@tokimo/ui";
-import { useTranslation } from "../i18n";
 import { mailApi } from "../generated/rust-api";
 import type { MailAccountOutput } from "../generated/rust-api/mail";
+import { useTranslation } from "../i18n";
 import { useMessage } from "../lib/shell-context";
 
 const SECURITY_OPTIONS = [

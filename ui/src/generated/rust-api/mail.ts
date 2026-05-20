@@ -10,22 +10,22 @@ import {
 // ── Types from ts-rs (auto-generated) ──
 
 export type {
-  MailProviderPresetOutput,
-  MailAccountOutput,
-  MailFolderOutput,
-  MailAddressOutput,
-  MailMessageSummaryOutput,
-  MailMessageListOutput,
-  MailAttachmentOutput,
-  MailMessageFullOutput,
+  BulkMessageIdsBody,
   CreateAccountBody,
-  UpdateAccountBody,
   DetectProviderQuery,
   ListMessagesQuery,
-  BulkMessageIdsBody,
+  MailAccountOutput,
+  MailAddressOutput,
+  MailAttachmentOutput,
+  MailFolderOutput,
+  MailMessageFullOutput,
+  MailMessageListOutput,
+  MailMessageSummaryOutput,
+  MailProviderPresetOutput,
   MoveMessagesBody,
-  SendMessageBody,
   SearchQuery,
+  SendMessageBody,
+  UpdateAccountBody,
 } from "../rust-types";
 
 // ── Input types (API-level, not generated) ──
@@ -109,11 +109,11 @@ interface SearchInput {
 // ── Re-export generated types for convenience ──
 
 import type {
-  MailProviderPresetOutput,
   MailAccountOutput,
   MailFolderOutput,
-  MailMessageListOutput,
   MailMessageFullOutput,
+  MailMessageListOutput,
+  MailProviderPresetOutput,
 } from "../rust-types";
 
 // ── API ──────────────────────────────────────────────────────────────────────

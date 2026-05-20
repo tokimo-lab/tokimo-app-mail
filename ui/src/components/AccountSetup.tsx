@@ -22,9 +22,9 @@ import {
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
-import { useTranslation } from "../i18n";
 import { mailApi } from "../generated/rust-api";
 import type { MailProviderPresetOutput } from "../generated/rust-api/mail";
+import { useTranslation } from "../i18n";
 import { useMessage } from "../lib/shell-context";
 
 const SECURITY_OPTIONS = [

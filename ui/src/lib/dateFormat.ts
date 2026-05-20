@@ -1,7 +1,9 @@
 import { useContext } from "react";
 import { LocaleContext } from "./shell-context";
 
-export function useDateFormat(): { formatLong: (date: string | Date) => string } {
+export function useDateFormat(): {
+  formatLong: (date: string | Date) => string;
+} {
   const locale = useContext(LocaleContext);
   return {
     formatLong: (date) =>

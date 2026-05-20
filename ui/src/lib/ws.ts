@@ -1,8 +1,11 @@
-import { useMemo } from "react";
 import type { ShellApi } from "@tokimo/sdk";
+import { useMemo } from "react";
 
 type WsMessage<T = unknown> = { data: T };
-type SubscribeFn = (eventType: string, handler: (msg: WsMessage) => void) => () => void;
+type SubscribeFn = (
+  eventType: string,
+  handler: (msg: WsMessage) => void,
+) => () => void;
 
 type ShellWithWs = ShellApi & { ws?: { subscribe?: SubscribeFn } };
 
@@ -15,7 +18,8 @@ export function useWs(shell?: ShellApi): { subscribe: SubscribeFn } {
   return useMemo(
     () => ({
       subscribe: (eventType, handler) => {
-        if (shell && hasWs(shell)) return shell.ws.subscribe(eventType, handler);
+        if (shell && hasWs(shell))
+          return shell.ws.subscribe(eventType, handler);
         return () => undefined;
       },
     }),

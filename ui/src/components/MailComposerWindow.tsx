@@ -5,12 +5,17 @@ import { clearBridge, getBridge } from "../modal-bridge";
 import type { MailAccountBrief } from "./MailComposer";
 import { MailComposer } from "./MailComposer";
 
-function readString(meta: Record<string, unknown>, key: string): string | undefined {
+function readString(
+  meta: Record<string, unknown>,
+  key: string,
+): string | undefined {
   const value = meta[key];
   return typeof value === "string" ? value : undefined;
 }
 
-function readMode(meta: Record<string, unknown>): "reply" | "forward" | undefined {
+function readMode(
+  meta: Record<string, unknown>,
+): "reply" | "forward" | undefined {
   const value = meta.mode;
   return value === "reply" || value === "forward" ? value : undefined;
 }
@@ -30,7 +35,11 @@ function readAccounts(meta: Record<string, unknown>): MailAccountBrief[] {
   return Array.isArray(value) ? value.filter(isAccountBrief) : [];
 }
 
-export default function MailComposerWindow({ win }: { win: ShellWindowHandle }) {
+export default function MailComposerWindow({
+  win,
+}: {
+  win: ShellWindowHandle;
+}) {
   const meta = win.metadata;
   const bridgeId = readString(meta, "bridgeId");
   const [bridge] = useState(() => (bridgeId ? getBridge(bridgeId) : undefined));

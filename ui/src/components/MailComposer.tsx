@@ -10,9 +10,9 @@ import {
 } from "@tokimo/ui";
 import { Paperclip, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useTranslation } from "../i18n";
 import { mailApi } from "../generated/rust-api";
 import type { MailMessageFullOutput } from "../generated/rust-api/mail";
+import { useTranslation } from "../i18n";
 import { useMessage } from "../lib/shell-context";
 
 function formatBytes(bytes: number): string {

@@ -1,8 +1,8 @@
 import { type AppRuntimeCtx, type Dispose, defineApp } from "@tokimo/sdk";
 import { StrictMode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { MailApp } from "./MailApp";
 import { translations } from "./i18n";
+import { MailApp } from "./MailApp";
 import "./index.css";
 import { MailProviders } from "./lib/providers";
 

@@ -12,12 +12,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { useTranslation } from "../i18n";
 import { mailApi } from "../generated/rust-api";
 import type {
   MailAddressOutput,
   MailMessageFullOutput,
 } from "../generated/rust-api/mail";
+import { useTranslation } from "../i18n";
 import { useDateFormat } from "../lib/dateFormat";
 
 interface MailViewerProps {

@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import type { ShellApi } from "@tokimo/sdk";
 import {
   AppSidebar,
   type AppSidebarFooterAction,
@@ -22,14 +23,13 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
-import { useTranslation } from "../i18n";
 import { mailApi } from "../generated/rust-api";
 import type {
   MailAccountOutput,
   MailFolderOutput,
 } from "../generated/rust-api/mail";
+import { useTranslation } from "../i18n";
 import { useWs } from "../lib/ws";
-import type { ShellApi } from "@tokimo/sdk";
 
 const SPECIAL_FOLDER_ICONS: Record<string, typeof Inbox> = {
   inbox: Inbox,

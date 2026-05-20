@@ -9,7 +9,11 @@ function getBridgeId(win: ShellWindowHandle): string | null {
   return typeof value === "string" ? value : null;
 }
 
-export default function AccountSetupWindow({ win }: { win: ShellWindowHandle }) {
+export default function AccountSetupWindow({
+  win,
+}: {
+  win: ShellWindowHandle;
+}) {
   const bridgeId = getBridgeId(win);
   const [bridge] = useState(() => (bridgeId ? getBridge(bridgeId) : undefined));
 

@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import type { ShellApi } from "@tokimo/sdk";
 import {
   cn,
   Empty,
@@ -9,15 +10,14 @@ import {
 } from "@tokimo/ui";
 import { Inbox, Paperclip, Star } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useTranslation } from "../i18n";
 import { mailApi } from "../generated/rust-api";
 import type {
   MailFolderOutput,
   MailMessageListOutput,
   MailMessageSummaryOutput,
 } from "../generated/rust-api/mail";
+import { useTranslation } from "../i18n";
 import { useWs } from "../lib/ws";
-import type { ShellApi } from "@tokimo/sdk";
 
 const PAGE_SIZE = 50;
 const LOAD_THRESHOLD = 120; // px from bottom to trigger next page

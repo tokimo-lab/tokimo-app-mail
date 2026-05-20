@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 
 export type TranslationValue = string | string[];
 export type TranslationMap = Record<string, TranslationValue>;
@@ -29,7 +29,8 @@ const en: TranslationMap = {
   "mail.viewer.forward": "Forward",
   "mail.viewer.delete": "Delete",
   "mail.viewer.confirmDeleteTitle": "Delete message?",
-  "mail.viewer.confirmDeleteContent": "This message will be deleted from the mailbox.",
+  "mail.viewer.confirmDeleteContent":
+    "This message will be deleted from the mailbox.",
   "mail.viewer.deleteSuccess": "Message deleted",
   "mail.viewer.deleteFailed": "Failed to delete message: {{error}}",
   "mail.viewer.messageNotFound": "Message not found",
@@ -109,9 +110,14 @@ const en: TranslationMap = {
   "mail.account.newPassword": "New password",
   "mail.account.newPasswordPlaceholder": "Enter new password",
   "common.setupGuide.getStarted": "Set up {{name}}",
-  "common.setupGuide.mailTagline": "Connect an IMAP/SMTP account to read and send mail in Tokimo.",
+  "common.setupGuide.mailTagline":
+    "Connect an IMAP/SMTP account to read and send mail in Tokimo.",
   "common.setupGuide.mailAction": "Add account",
-  "common.setupGuide.mailFeatures": ["Sync folders and messages", "Read mail with attachments", "Compose replies and forwards"],
+  "common.setupGuide.mailFeatures": [
+    "Sync folders and messages",
+    "Read mail with attachments",
+    "Compose replies and forwards",
+  ],
 };
 
 const zh: TranslationMap = {
@@ -137,9 +143,14 @@ const zh: TranslationMap = {
   "mail.account.editAccount": "编辑账户",
   "mail.account.deleteAccount": "删除账户",
   "common.setupGuide.getStarted": "设置 {{name}}",
-  "common.setupGuide.mailTagline": "连接 IMAP/SMTP 账户，在 Tokimo 中收发邮件。",
+  "common.setupGuide.mailTagline":
+    "连接 IMAP/SMTP 账户，在 Tokimo 中收发邮件。",
   "common.setupGuide.mailAction": "添加账户",
-  "common.setupGuide.mailFeatures": ["同步文件夹和邮件", "阅读邮件和附件", "撰写回复与转发"],
+  "common.setupGuide.mailFeatures": [
+    "同步文件夹和邮件",
+    "阅读邮件和附件",
+    "撰写回复与转发",
+  ],
 };
 
 export const enUS = en;
@@ -155,7 +166,10 @@ function interpolate(text: string, options?: TranslationOptions): string {
 }
 
 export type TFunction = {
-  (key: string, options: TranslationOptions & { returnObjects: true }): string[];
+  (
+    key: string,
+    options: TranslationOptions & { returnObjects: true },
+  ): string[];
   (key: string, options?: TranslationOptions): string;
 };
 
@@ -173,8 +187,18 @@ function makeT(locale: string): TFunction {
 
 const TranslationContext = createContext<TFunction>(makeT("en-US"));
 
-export function TranslationProvider({ locale, children }: { locale: string; children: ReactNode }) {
-  return <TranslationContext.Provider value={makeT(locale)}>{children}</TranslationContext.Provider>;
+export function TranslationProvider({
+  locale,
+  children,
+}: {
+  locale: string;
+  children: ReactNode;
+}) {
+  return (
+    <TranslationContext.Provider value={makeT(locale)}>
+      {children}
+    </TranslationContext.Provider>
+  );
 }
 
 export function useTranslation(): { t: TFunction } {

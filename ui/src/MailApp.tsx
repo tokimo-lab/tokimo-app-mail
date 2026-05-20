@@ -17,29 +17,52 @@ import { registerBridge } from "./modal-bridge";
 
 export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
   const { t } = useTranslation();
-  const { accounts, isLoading: accountsLoading, refetch: refetchAccounts } = useMailAccounts();
+  const {
+    accounts,
+    isLoading: accountsLoading,
+    refetch: refetchAccounts,
+  } = useMailAccounts();
   const msg = ctx.shell.toast;
   const qc = useQueryClient();
-  const [editingAccount, setEditingAccount] = useState<MailAccountOutput | null>(null);
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const [editingAccount, setEditingAccount] =
+    useState<MailAccountOutput | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
+    null,
+  );
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(
+    null,
+  );
   const [containerRef, containerWidth] = useContainerWidth();
-  const [manuallyCollapsed, setManuallyCollapsed] = useState<boolean | null>(null);
-  const sidebarCollapsed = manuallyCollapsed ?? (containerWidth > 0 && containerWidth < 720);
+  const [manuallyCollapsed, setManuallyCollapsed] = useState<boolean | null>(
+    null,
+  );
+  const sidebarCollapsed =
+    manuallyCollapsed ?? (containerWidth > 0 && containerWidth < 720);
 
-  const activeAccountId = selectedAccountId ?? (accounts.length > 0 ? accounts[0].id : null);
+  const activeAccountId =
+    selectedAccountId ?? (accounts.length > 0 ? accounts[0].id : null);
   const didAutoSelect = useRef(false);
 
   useEffect(() => {
-    if (!didAutoSelect.current && !selectedAccountId && activeAccountId && !accountsLoading) {
+    if (
+      !didAutoSelect.current &&
+      !selectedAccountId &&
+      activeAccountId &&
+      !accountsLoading
+    ) {
       didAutoSelect.current = true;
       setSelectedAccountId(activeAccountId);
     }
   }, [selectedAccountId, activeAccountId, accountsLoading]);
 
   const accountBriefs = useMemo(
-    () => accounts.map((a) => ({ id: a.id, email: a.email, displayName: a.displayName })),
+    () =>
+      accounts.map((a) => ({
+        id: a.id,
+        email: a.email,
+        displayName: a.displayName,
+      })),
     [accounts],
   );
 
@@ -59,11 +82,16 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
       const id = vars.message_ids[0];
       if (selectedMessageId === id) setSelectedMessageId(null);
       if (activeAccountId) {
-        qc.invalidateQueries({ queryKey: mailApi.listFolders.queryKey({ accountId: activeAccountId }) });
+        qc.invalidateQueries({
+          queryKey: mailApi.listFolders.queryKey({
+            accountId: activeAccountId,
+          }),
+        });
       }
       msg.success(t("mail.viewer.deleteSuccess"));
     },
-    onError: (err) => msg.error(t("mail.viewer.deleteFailed", { error: err.message })),
+    onError: (err) =>
+      msg.error(t("mail.viewer.deleteFailed", { error: err.message })),
   });
 
   const openComposer = useCallback(
@@ -88,7 +116,12 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
       });
       ctx.shell.openModalWindow({
         component: () => import("./components/MailComposerWindow"),
-        title: options?.mode === "reply" ? t("mail.composer.reply") : options?.mode === "forward" ? t("mail.composer.forward") : t("mail.composer.newMessage"),
+        title:
+          options?.mode === "reply"
+            ? t("mail.composer.reply")
+            : options?.mode === "forward"
+              ? t("mail.composer.forward")
+              : t("mail.composer.newMessage"),
         width: 700,
         height: 560,
         metadata: {
@@ -100,7 +133,15 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
         },
       });
     },
-    [accountBriefs, activeAccountId, ctx.locale, ctx.shell, qc, selectedFolderId, t],
+    [
+      accountBriefs,
+      activeAccountId,
+      ctx.locale,
+      ctx.shell,
+      qc,
+      selectedFolderId,
+      t,
+    ],
   );
 
   const handleAddAccount = useCallback(() => {
@@ -133,7 +174,8 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
       setSelectedFolderId(null);
       setSelectedMessageId(null);
     },
-    onError: (err) => msg.error(t("mail.account.deleteFailed", { error: err.message })),
+    onError: (err) =>
+      msg.error(t("mail.account.deleteFailed", { error: err.message })),
   });
 
   const handleDeleteAccount = useCallback(
@@ -159,8 +201,16 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
             key: "mail",
             label: t("mail.app.title"),
             items: [
-              { key: "compose", label: t("mail.sidebar.compose"), onClick: () => openComposer() },
-              { key: "add-account", label: t("mail.sidebar.addAccount"), onClick: handleAddAccount },
+              {
+                key: "compose",
+                label: t("mail.sidebar.compose"),
+                onClick: () => openComposer(),
+              },
+              {
+                key: "add-account",
+                label: t("mail.sidebar.addAccount"),
+                onClick: handleAddAccount,
+              },
             ],
           },
         ],
@@ -171,7 +221,11 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
   );
 
   if (accountsLoading) {
-    return <div className="flex h-full items-center justify-center"><Spin /></div>;
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Spin />
+      </div>
+    );
   }
 
   if (accounts.length === 0) {
@@ -181,7 +235,9 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
         accentColor="blue"
         title={t("common.setupGuide.getStarted", { name: "Mail" })}
         description={t("common.setupGuide.mailTagline")}
-        features={t("common.setupGuide.mailFeatures", { returnObjects: true }).map((label, i) => ({ icon: [Plus, Inbox, Send][i], label }))}
+        features={t("common.setupGuide.mailFeatures", {
+          returnObjects: true,
+        }).map((label, i) => ({ icon: [Plus, Inbox, Send][i], label }))}
         actionLabel={t("common.setupGuide.mailAction")}
         actionIcon={Plus}
         onAction={handleAddAccount}
@@ -201,7 +257,9 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
           onSelectFolder={handleSelectFolder}
           onAddAccount={handleAddAccount}
           onCompose={() => openComposer()}
-          onToggleCollapse={() => setManuallyCollapsed((v) => !(v ?? sidebarCollapsed))}
+          onToggleCollapse={() =>
+            setManuallyCollapsed((v) => !(v ?? sidebarCollapsed))
+          }
           onEditAccount={setEditingAccount}
           onDeleteAccount={handleDeleteAccount}
           shell={ctx.shell}
@@ -217,30 +275,47 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
           />
         ) : (
           <div className="flex w-72 shrink-0 items-center justify-center border-r border-border-base">
-            <Empty image={<Mail className="size-10 stroke-1" />} description={t("mail.app.selectFolder")} />
+            <Empty
+              image={<Mail className="size-10 stroke-1" />}
+              description={t("mail.app.selectFolder")}
+            />
           </div>
         )}
 
         {selectedMessageId ? (
           <MailViewer
             messageId={selectedMessageId}
-            onReply={(messageId) => openComposer({ mode: "reply", replyToMessageId: messageId })}
-            onForward={(messageId) => openComposer({ mode: "forward", replyToMessageId: messageId })}
-            onDelete={(id) => deleteMessageMutation.mutate({ message_ids: [id] })}
+            onReply={(messageId) =>
+              openComposer({ mode: "reply", replyToMessageId: messageId })
+            }
+            onForward={(messageId) =>
+              openComposer({ mode: "forward", replyToMessageId: messageId })
+            }
+            onDelete={(id) =>
+              deleteMessageMutation.mutate({ message_ids: [id] })
+            }
             onClose={() => setSelectedMessageId(null)}
           />
         ) : (
           <div className="flex min-w-0 flex-1 items-center justify-center">
             <Empty
               image={<Mail className="size-10 stroke-1" />}
-              description={selectedFolderId ? t("mail.app.selectMessage") : t("mail.app.selectFolderFirst")}
+              description={
+                selectedFolderId
+                  ? t("mail.app.selectMessage")
+                  : t("mail.app.selectFolderFirst")
+              }
             />
           </div>
         )}
       </div>
 
       {editingAccount && (
-        <AccountEditDialog account={editingAccount} open={true} onClose={() => setEditingAccount(null)} />
+        <AccountEditDialog
+          account={editingAccount}
+          open={true}
+          onClose={() => setEditingAccount(null)}
+        />
       )}
     </>
   );
