@@ -23,7 +23,7 @@ use uuid::Uuid;
 #[command(
     name = "tokimo-app-mail",
     about = "Mail — Tokimo 邮件 CLI",
-    long_about = "Tokimo Mail CLI — 管理邮件账户、文件夹、发送和接收邮件。\n\n前置条件：\n1. 启动 Tokimo 主 server (默认 http://localhost:5678)\n2. 浏览器登录后，去「设置 → API Keys」创建一个 token (mm_xxx)\n3. 把 token 通过 --tokimo-token 或 TOKIMO_TOKEN env 传入",
+    long_about = "Tokimo Mail CLI — 管理邮件账户、文件夹、发送和接收邮件。\n\n前置条件：\n1. 在浏览器登录 Tokimo 后，去「设置 → API Keys」创建一个 token (mm_xxx)\n2. 把 token 通过 --tokimo-token 或 TOKIMO_TOKEN env 传入\n3. 确保 DATABASE_URL env 指向 Tokimo 数据库（与主 server 一致）\n\nCLI 直接读写数据库，不依赖主 server 进程运行。",
     term_width = 100
 )]
 struct Cli {
