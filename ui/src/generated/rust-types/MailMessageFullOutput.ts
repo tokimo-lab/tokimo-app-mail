@@ -2,25 +2,4 @@
 import type { MailAddressOutput } from "./MailAddressOutput";
 import type { MailAttachmentOutput } from "./MailAttachmentOutput";
 
-export type MailMessageFullOutput = {
-  id: string;
-  uid: number;
-  messageId: string | null;
-  subject: string;
-  from: Array<MailAddressOutput>;
-  to: Array<MailAddressOutput>;
-  cc: Array<MailAddressOutput>;
-  bcc: Array<MailAddressOutput>;
-  replyTo: Array<MailAddressOutput>;
-  date: string | null;
-  isRead: boolean;
-  isFlagged: boolean;
-  inReplyTo: string | null;
-  references: Array<string>;
-  textBody: string | null;
-  htmlBody: string | null;
-  attachments: Array<MailAttachmentOutput>;
-  size: number;
-  folderId: string;
-  accountId: string;
-};
+export type MailMessageFullOutput = { id: string, uid: number, messageId: string | null, subject: string, from: Array<MailAddressOutput>, to: Array<MailAddressOutput>, cc: Array<MailAddressOutput>, bcc: Array<MailAddressOutput>, replyTo: Array<MailAddressOutput>, date: string | null, isRead: boolean, isFlagged: boolean, inReplyTo: string | null, references: Array<string>, textBody: string | null, htmlBody: string | null, attachments: Array<MailAttachmentOutput>, size: number, folderId: string, accountId: string, };
