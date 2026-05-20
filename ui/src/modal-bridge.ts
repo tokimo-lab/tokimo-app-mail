@@ -7,7 +7,14 @@ interface AccountSetupBridge {
   onComplete: (createdId: string) => void;
 }
 
-export type ModalBridge = AccountSetupBridge;
+interface ComposerBridge {
+  kind: "composer";
+  shell: ShellApi;
+  locale: string;
+  onSent?: () => void;
+}
+
+export type ModalBridge = AccountSetupBridge | ComposerBridge;
 
 const registry = new Map<string, ModalBridge>();
 let counter = 0;
