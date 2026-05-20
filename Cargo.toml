@@ -1,0 +1,35 @@
+[package]
+name        = "tokimo-app-mail"
+version     = "0.1.0"
+edition     = "2024"
+rust-version = "1.94.0"
+license     = "MIT OR Apache-2.0"
+description = "Tokimo mail app — standalone multi-process IMAP/SMTP client."
+
+[dependencies]
+tokimo-bus-client   = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "b68aa99c846fbe9e201df5b6a7ea91d84b642340" }
+tokimo-bus-protocol = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "b68aa99c846fbe9e201df5b6a7ea91d84b642340", features = ["axum"] }
+tokimo-bus-auth     = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "b68aa99c846fbe9e201df5b6a7ea91d84b642340", features = ["axum", "cli-db"] }
+tokimo-bus-cli      = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "b68aa99c846fbe9e201df5b6a7ea91d84b642340" }
+tokimo-mail         = { path = "../../packages/tokimo-mail" }
+
+clap              = { version = "4", features = ["derive", "env"] }
+tokio             = { workspace = true, features = ["rt-multi-thread", "macros", "time", "signal", "sync"] }
+tracing           = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+serde             = { workspace = true, features = ["derive"] }
+serde_json        = { workspace = true }
+uuid              = { workspace = true, features = ["v4", "serde"] }
+chrono            = { workspace = true, features = ["serde"] }
+sea-orm           = { version = "2.0.0-rc.37", default-features = false, features = ["sqlx-postgres", "runtime-tokio-rustls", "with-uuid", "with-json", "with-chrono", "macros"] }
+rust-embed        = { version = "8", features = ["debug-embed"] }
+mime_guess        = "2"
+anyhow            = { workspace = true }
+axum              = { version = "0.8", features = ["json", "multipart"] }
+base64            = { workspace = true }
+ts-rs             = { version = "12", features = ["serde-json-impl"] }
+
+[profile.release]
+lto       = "thin"
+opt-level = 3
+strip     = "symbols"

@@ -1,0 +1,16 @@
+export type { BulkMessageIdsBody } from "./BulkMessageIdsBody";
+export type { CreateAccountBody } from "./CreateAccountBody";
+export type { DetectProviderQuery } from "./DetectProviderQuery";
+export type { ListMessagesQuery } from "./ListMessagesQuery";
+export type { MailAccountOutput } from "./MailAccountOutput";
+export type { MailAddressOutput } from "./MailAddressOutput";
+export type { MailAttachmentOutput } from "./MailAttachmentOutput";
+export type { MailFolderOutput } from "./MailFolderOutput";
+export type { MailMessageFullOutput } from "./MailMessageFullOutput";
+export type { MailMessageListOutput } from "./MailMessageListOutput";
+export type { MailMessageSummaryOutput } from "./MailMessageSummaryOutput";
+export type { MailProviderPresetOutput } from "./MailProviderPresetOutput";
+export type { MoveMessagesBody } from "./MoveMessagesBody";
+export type { SearchQuery } from "./SearchQuery";
+export type { SendMessageBody } from "./SendMessageBody";
+export type { UpdateAccountBody } from "./UpdateAccountBody";

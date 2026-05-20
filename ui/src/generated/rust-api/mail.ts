@@ -7,110 +7,28 @@ import {
   rustUrl,
 } from "../../lib/rust-api-runtime";
 
-// ── Output types (mirrors Rust DTOs — will be auto-generated after `make gen:api`) ──
+// ── Types from ts-rs (auto-generated) ──
 
-export interface MailProviderPresetOutput {
-  provider: string;
-  displayName: string;
-  imapHost: string;
-  imapPort: number;
-  imapSecurity: string;
-  smtpHost: string;
-  smtpPort: number;
-  smtpSecurity: string;
-  setupInstructions: string[];
-  requiresAppPassword: boolean;
-  appPasswordUrl: string | null;
-  domains: string[];
-}
+export type {
+  MailProviderPresetOutput,
+  MailAccountOutput,
+  MailFolderOutput,
+  MailAddressOutput,
+  MailMessageSummaryOutput,
+  MailMessageListOutput,
+  MailAttachmentOutput,
+  MailMessageFullOutput,
+  CreateAccountBody,
+  UpdateAccountBody,
+  DetectProviderQuery,
+  ListMessagesQuery,
+  BulkMessageIdsBody,
+  MoveMessagesBody,
+  SendMessageBody,
+  SearchQuery,
+} from "../rust-types";
 
-export interface MailAccountOutput {
-  id: string;
-  displayName: string;
-  email: string;
-  provider: string;
-  imapHost: string;
-  imapPort: number;
-  imapSecurity: string;
-  smtpHost: string;
-  smtpPort: number;
-  smtpSecurity: string;
-  senderName: string | null;
-  isEnabled: boolean;
-  syncInterval: number;
-  lastSyncAt: string | null;
-  createdAt: string | null;
-}
-
-export interface MailFolderOutput {
-  id: string;
-  accountId: string;
-  name: string;
-  delimiter: string | null;
-  folderType: string;
-  totalCount: number;
-  unreadCount: number;
-  sortOrder: number;
-}
-
-export interface MailAddressOutput {
-  name: string | null;
-  address: string;
-}
-
-export interface MailMessageSummaryOutput {
-  id: string;
-  uid: number;
-  messageId: string | null;
-  subject: string;
-  from: MailAddressOutput[];
-  to: MailAddressOutput[];
-  date: string | null;
-  isRead: boolean;
-  isFlagged: boolean;
-  hasAttachments: boolean;
-  preview: string;
-  size: number;
-  folderId: string;
-}
-
-export interface MailMessageListOutput {
-  messages: MailMessageSummaryOutput[];
-  total: number;
-}
-
-export interface MailAttachmentOutput {
-  id: string;
-  filename: string;
-  contentType: string;
-  size: number;
-  data: string | null;
-}
-
-export interface MailMessageFullOutput {
-  id: string;
-  uid: number;
-  messageId: string | null;
-  subject: string;
-  from: MailAddressOutput[];
-  to: MailAddressOutput[];
-  cc: MailAddressOutput[];
-  bcc: MailAddressOutput[];
-  replyTo: MailAddressOutput[];
-  date: string | null;
-  isRead: boolean;
-  isFlagged: boolean;
-  inReplyTo: string | null;
-  references: string[];
-  textBody: string | null;
-  htmlBody: string | null;
-  attachments: MailAttachmentOutput[];
-  size: number;
-  folderId: string;
-  accountId: string;
-}
-
-// ── Input types ──────────────────────────────────────────────────────────────
+// ── Input types (API-level, not generated) ──
 
 export interface CreateAccountInput {
   display_name: string;
@@ -187,6 +105,16 @@ interface SearchInput {
   q: string;
   folder_id?: string;
 }
+
+// ── Re-export generated types for convenience ──
+
+import type {
+  MailProviderPresetOutput,
+  MailAccountOutput,
+  MailFolderOutput,
+  MailMessageListOutput,
+  MailMessageFullOutput,
+} from "../rust-types";
 
 // ── API ──────────────────────────────────────────────────────────────────────
 

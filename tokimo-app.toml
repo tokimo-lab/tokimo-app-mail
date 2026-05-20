@@ -1,0 +1,20 @@
+[app]
+id          = "mail"
+display     = "Mail"
+version     = "0.1.0"
+description = "Tokimo 邮件客户端 — IMAP/SMTP 多账户管理"
+
+[runtime]
+lifecycle    = "resident"
+binary       = "tokimo-app-mail"
+ui_dist      = "ui/dist"
+
+[ui]
+entry        = "assets/index.js"
+window_type  = "mail"
+category     = "system"
+icon         = "Mail"
+image        = "icon.png"
+color        = "#3b82f6"
+width        = 1200
+height       = 800
