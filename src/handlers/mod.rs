@@ -7,14 +7,23 @@ use serde::Serialize;
 
 use crate::error::AppError;
 
-/// 统一 API 响应包装 — 同主 server 的 ApiResponse。
+/// 统一 API 响应包装 — 同主 server 的 ApiResponse 格式：
+/// `{ success: true, data: T }`，前端 callApi 依赖 `success` 字段判定成败。
 #[derive(Serialize)]
 pub struct ApiResponse<T: Serialize> {
-    pub data: T,
+    pub success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<T>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 pub fn ok<T: Serialize>(data: T) -> Json<ApiResponse<T>> {
-    Json(ApiResponse { data })
+    Json(ApiResponse {
+        success: true,
+        data: Some(data),
+        error: None,
+    })
 }
 
 /// Parse user_id string to Uuid, returning AppError on failure.

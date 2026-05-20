@@ -37,7 +37,10 @@ impl IntoResponse for AppError {
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        let body = serde_json::json!({ "error": self.to_string() });
+        let body = serde_json::json!({
+            "success": false,
+            "error": self.to_string(),
+        });
         (status, Json(body)).into_response()
     }
 }
