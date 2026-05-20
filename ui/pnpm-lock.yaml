@@ -15,7 +15,7 @@ importers:
         version: 5.100.11(react@19.2.6)
       '@tokimo/sdk':
         specifier: file:/home/william/me/tokimo.io/packages/tokimo-package-sdk
-        version: file:../../../packages/tokimo-package-sdk(emoji-mart@5.6.0)(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(tailwindcss@4.3.0)(typescript@6.0.3)
+        version: file:../../../packages/tokimo-package-sdk(@tanstack/react-query@5.100.11(react@19.2.6))(emoji-mart@5.6.0)(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(tailwindcss@4.3.0)(typescript@6.0.3)
       '@tokimo/ui':
         specifier: file:/home/william/me/tokimo.io/packages/ui
         version: file:../../../packages/ui(emoji-mart@5.6.0)(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(tailwindcss@4.3.0)(typescript@6.0.3)
@@ -411,6 +411,7 @@ packages:
   '@tokimo/sdk@file:../../../packages/tokimo-package-sdk':
     resolution: {directory: ../../../packages/tokimo-package-sdk, type: directory}
     peerDependencies:
+      '@tanstack/react-query': ^5.0.0
       react: ^19.0.0
       react-dom: ^19.0.0
 
@@ -1054,8 +1055,9 @@ snapshots:
       - '@rolldown/plugin-babel'
       - babel-plugin-react-compiler
 
-  '@tokimo/sdk@file:../../../packages/tokimo-package-sdk(emoji-mart@5.6.0)(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(tailwindcss@4.3.0)(typescript@6.0.3)':
+  '@tokimo/sdk@file:../../../packages/tokimo-package-sdk(@tanstack/react-query@5.100.11(react@19.2.6))(emoji-mart@5.6.0)(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(tailwindcss@4.3.0)(typescript@6.0.3)':
     dependencies:
+      '@tanstack/react-query': 5.100.11(react@19.2.6)
       '@tokimo/viewers': file:../../../packages/tokimo-viewers(emoji-mart@5.6.0)(i18next@26.2.0(typescript@6.0.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(tailwindcss@4.3.0)(typescript@6.0.3)
       react: 19.2.6
       react-dom: 19.2.6(react@19.2.6)
