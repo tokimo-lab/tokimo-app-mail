@@ -40,7 +40,7 @@ pub async fn sync_account(
     info!("Starting mail sync for account: {} ({})", account.email, account.id);
 
     let cfg = account_to_config(&account);
-    let client = tokimo_mail::MailClient::new(cfg.clone());
+    let client = tokimo_package_mail::MailClient::new(cfg.clone());
 
     // 1. Sync folders first.
     let remote_folders = client
@@ -100,7 +100,7 @@ pub async fn quick_sync_folder(
         .ok_or_else(|| AppError::NotFound("Account not found".into()))?;
 
     let cfg = account_to_config(&account);
-    let mut imap = tokimo_mail::MailSession::connect(&cfg)
+    let mut imap = tokimo_package_mail::MailSession::connect(&cfg)
         .await
         .map_err(|e| AppError::Internal(format!("IMAP connect: {e}")))?;
 
@@ -160,7 +160,7 @@ pub async fn list_page_from_imap(
         .ok_or_else(|| AppError::NotFound("Account not found".into()))?;
 
     let cfg = account_to_config(&account);
-    let mut imap = tokimo_mail::MailSession::connect(&cfg)
+    let mut imap = tokimo_package_mail::MailSession::connect(&cfg)
         .await
         .map_err(|e| AppError::Internal(format!("IMAP connect: {e}")))?;
 
@@ -199,12 +199,12 @@ pub async fn list_page_from_imap(
 
 async fn sync_folder_messages(
     db: &DatabaseConnection,
-    cfg: &tokimo_mail::MailAccountConfig,
+    cfg: &tokimo_package_mail::MailAccountConfig,
     account_id: Uuid,
     folder: &mail_folders::Model,
     event_tx: Option<&dyn EventBroadcaster>,
 ) -> Result<(), AppError> {
-    let mut imap = tokimo_mail::MailSession::connect(cfg)
+    let mut imap = tokimo_package_mail::MailSession::connect(cfg)
         .await
         .map_err(|e| AppError::Internal(format!("IMAP connect for '{}': {e}", folder.name)))?;
 
@@ -357,7 +357,7 @@ pub async fn store_summaries_batch(
     db: &DatabaseConnection,
     account_id: Uuid,
     folder: &mail_folders::Model,
-    summaries: &[tokimo_mail::MailMessageSummary],
+    summaries: &[tokimo_package_mail::MailMessageSummary],
 ) -> Result<(), AppError> {
     if summaries.is_empty() {
         return Ok(());
@@ -386,7 +386,7 @@ const HISTORY_BATCH_RANGE: u32 = 2000;
 
 async fn backfill_history_session(
     db: &DatabaseConnection,
-    imap: &mut tokimo_mail::MailSession,
+    imap: &mut tokimo_package_mail::MailSession,
     account_id: Uuid,
     folder: &mail_folders::Model,
     cursor: Option<i32>,
@@ -462,7 +462,7 @@ const FLAGS_BATCH: usize = 500;
 
 async fn sync_flags_session(
     db: &DatabaseConnection,
-    cfg: &tokimo_mail::MailAccountConfig,
+    cfg: &tokimo_package_mail::MailAccountConfig,
     account_id: Uuid,
     folder: &mail_folders::Model,
     prefetched: Option<Vec<(i32, i32, bool)>>,
@@ -479,7 +479,7 @@ async fn sync_flags_session(
         }
     };
 
-    let mut imap = tokimo_mail::MailSession::connect(cfg)
+    let mut imap = tokimo_package_mail::MailSession::connect(cfg)
         .await
         .map_err(|e| AppError::Internal(format!("IMAP connect for flags '{}': {e}", folder.name)))?;
     imap.open_folder(&folder.name)
@@ -530,7 +530,7 @@ async fn sync_flags_session(
 }
 
 fn detect_folder_type(raw_name: &str, attributes: &[String]) -> String {
-    let decoded = tokimo_mail::decode_mailbox_name(raw_name);
+    let decoded = tokimo_package_mail::decode_mailbox_name(raw_name);
     let base = decoded.rsplit_once('/').map_or(decoded.as_str(), |(_, b)| b);
     let lower = base.to_lowercase();
     let attr_str = attributes.join(" ").to_lowercase();

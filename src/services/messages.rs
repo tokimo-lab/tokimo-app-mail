@@ -95,7 +95,7 @@ pub async fn get_message(
             let cfg = account_to_config(&account);
             let uid = msg.uid as u32;
             tokio::spawn(async move {
-                let client = tokimo_mail::MailClient::new(cfg);
+                let client = tokimo_package_mail::MailClient::new(cfg);
                 if let Err(e) = client.mark_read(&folder.name, &[uid]).await {
                     tracing::warn!("Failed to mark UID {uid} as seen on IMAP: {e}");
                 }
@@ -197,16 +197,16 @@ pub async fn send_message(
     user_id: Uuid,
     account_id: Uuid,
     body: SendMessageBody,
-    attachments: Vec<tokimo_mail::message::ComposeAttachment>,
+    attachments: Vec<tokimo_package_mail::message::ComposeAttachment>,
 ) -> Result<(), AppError> {
     let account = repos::accounts::find_by_id_and_user(db, account_id, user_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Account not found".into()))?;
 
     let cfg = account_to_config(&account);
-    let client = tokimo_mail::MailClient::new(cfg);
+    let client = tokimo_package_mail::MailClient::new(cfg);
 
-    let compose = tokimo_mail::message::ComposeMessage {
+    let compose = tokimo_package_mail::message::ComposeMessage {
         to: body.to,
         cc: body.cc.unwrap_or_default(),
         bcc: body.bcc.unwrap_or_default(),
@@ -267,12 +267,12 @@ pub async fn search_messages(
 
 async fn fetch_message_body_now(
     db: &DatabaseConnection,
-    cfg: &tokimo_mail::MailAccountConfig,
+    cfg: &tokimo_package_mail::MailAccountConfig,
     folder_name: &str,
     message_id: i32,
     uid: u32,
 ) -> Result<(), AppError> {
-    let mut session = tokimo_mail::MailSession::connect(cfg)
+    let mut session = tokimo_package_mail::MailSession::connect(cfg)
         .await
         .map_err(|e| AppError::Internal(format!("IMAP connect for on-demand fetch: {e}")))?;
 
@@ -382,7 +382,7 @@ async fn spawn_imap_flag_update(db: &DatabaseConnection, user_id: Uuid, message_
         };
         let cfg = account_to_config(&account);
         tokio::spawn(async move {
-            let client = tokimo_mail::MailClient::new(cfg);
+            let client = tokimo_package_mail::MailClient::new(cfg);
             let result = if mark_read {
                 client.mark_read(&folder.name, &uids).await
             } else {

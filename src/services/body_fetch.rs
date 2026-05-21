@@ -46,7 +46,7 @@ async fn fetch_for_account(
         .ok_or_else(|| AppError::NotFound("Mail account not found".into()))?;
     let cfg = account_to_config(&account);
 
-    let mut imap = tokimo_mail::MailSession::connect(&cfg)
+    let mut imap = tokimo_package_mail::MailSession::connect(&cfg)
         .await
         .map_err(|e| AppError::Internal(format!("IMAP connect for body fetch: {e}")))?;
 
@@ -97,7 +97,7 @@ async fn fetch_for_account(
                 }
             };
 
-            let mut by_uid: HashMap<u32, &tokimo_mail::MailMessage> = HashMap::new();
+            let mut by_uid: HashMap<u32, &tokimo_package_mail::MailMessage> = HashMap::new();
             for m in &full_messages {
                 by_uid.insert(m.uid, m);
             }

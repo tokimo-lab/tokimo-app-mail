@@ -347,7 +347,7 @@ pub async fn create_from_summary(
     db: &DatabaseConnection,
     account_id: Uuid,
     folder_id: Uuid,
-    s: &tokimo_mail::MailMessageSummary,
+    s: &tokimo_package_mail::MailMessageSummary,
 ) -> Result<(), AppError> {
     let now = chrono::Utc::now().fixed_offset();
     let is_read = s.flags.iter().any(|f| f == "\\Seen");

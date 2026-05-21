@@ -233,7 +233,7 @@ pub async fn send_message(
     const MAX_TOTAL_BYTES: usize = 50 * 1024 * 1024;
 
     let mut body: Option<SendMessageBody> = None;
-    let mut attachments: Vec<tokimo_mail::message::ComposeAttachment> = Vec::new();
+    let mut attachments: Vec<tokimo_package_mail::message::ComposeAttachment> = Vec::new();
     let mut total_bytes: usize = 0;
 
     while let Some(field) = multipart
@@ -268,7 +268,7 @@ pub async fn send_message(
                 if total_bytes > MAX_TOTAL_BYTES {
                     return Err(AppError::BadRequest("total attachment size exceeds 50 MB limit".into()));
                 }
-                attachments.push(tokimo_mail::message::ComposeAttachment {
+                attachments.push(tokimo_package_mail::message::ComposeAttachment {
                     filename,
                     content_type,
                     data: general_purpose::STANDARD.encode(&data),

@@ -31,7 +31,7 @@ pub async fn sync_folders(
         .ok_or_else(|| AppError::NotFound("Account not found".into()))?;
 
     let cfg = account_to_config(&account);
-    let client = tokimo_mail::MailClient::new(cfg);
+    let client = tokimo_package_mail::MailClient::new(cfg);
     let remote_folders = client
         .list_folders_with_counts()
         .await
@@ -65,7 +65,7 @@ pub async fn sync_folders(
 }
 
 pub fn display_folder_name(raw_name: &str, delimiter: Option<&str>) -> String {
-    let decoded = tokimo_mail::decode_mailbox_name(raw_name);
+    let decoded = tokimo_package_mail::decode_mailbox_name(raw_name);
     let display = match delimiter {
         Some(d) => decoded.rsplit_once(d).map_or(decoded.as_str(), |(_, b)| b),
         None => decoded.rsplit_once('/').map_or(decoded.as_str(), |(_, b)| b),
@@ -88,7 +88,7 @@ fn model_to_output(m: mail_folders::Model) -> MailFolderOutput {
 }
 
 fn detect_folder_type(raw_name: &str, attributes: &[String]) -> String {
-    let decoded = tokimo_mail::decode_mailbox_name(raw_name);
+    let decoded = tokimo_package_mail::decode_mailbox_name(raw_name);
     let base = decoded.rsplit_once('/').map_or(decoded.as_str(), |(_, b)| b);
     let lower = base.to_lowercase();
     let attr_str = attributes.join(" ").to_lowercase();

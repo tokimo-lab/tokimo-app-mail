@@ -171,7 +171,7 @@ pub async fn run_accounts(auth: TokimoAuthArgs, cmd: AccountsCmd) -> anyhow::Res
             // Auto-detect provider or use provided hosts.
             let (imap_h, smtp_h, provider) = if let (Some(ih), Some(sh)) = (&imap_host, &smtp_host) {
                 (ih.clone(), sh.clone(), "custom".to_string())
-            } else if let Some(preset) = tokimo_mail::provider::detect_provider(&email) {
+            } else if let Some(preset) = tokimo_package_mail::provider::detect_provider(&email) {
                 (preset.imap_host, preset.smtp_host, format!("{:?}", preset.provider).to_lowercase())
             } else {
                 anyhow::bail!("Cannot auto-detect provider for '{}'. Use --imap-host and --smtp-host.", email);
@@ -401,7 +401,7 @@ pub async fn run_send(
         let content_type = mime_guess::from_path(path)
             .first_or_octet_stream()
             .to_string();
-        attachments.push(tokimo_mail::message::ComposeAttachment {
+        attachments.push(tokimo_package_mail::message::ComposeAttachment {
             filename,
             content_type,
             data: base64::engine::general_purpose::STANDARD.encode(&data),

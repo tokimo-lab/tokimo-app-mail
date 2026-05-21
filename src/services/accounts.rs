@@ -125,7 +125,7 @@ pub async fn test_connection(db: &DatabaseConnection, user_id: Uuid, account_id:
         .ok_or_else(|| AppError::NotFound("Mail account not found".into()))?;
 
     let cfg = account_to_config(&account);
-    let client = tokimo_mail::MailClient::new(cfg);
+    let client = tokimo_package_mail::MailClient::new(cfg);
     client
         .test_connection()
         .await
@@ -153,19 +153,19 @@ fn model_to_output(m: mail_accounts::Model) -> MailAccountOutput {
     }
 }
 
-pub fn account_to_config(m: &mail_accounts::Model) -> tokimo_mail::MailAccountConfig {
+pub fn account_to_config(m: &mail_accounts::Model) -> tokimo_package_mail::MailAccountConfig {
     let imap_security = match m.imap_security.as_str() {
-        "starttls" => tokimo_mail::config::SecurityMode::StartTls,
-        "none" => tokimo_mail::config::SecurityMode::None,
-        _ => tokimo_mail::config::SecurityMode::Tls,
+        "starttls" => tokimo_package_mail::config::SecurityMode::StartTls,
+        "none" => tokimo_package_mail::config::SecurityMode::None,
+        _ => tokimo_package_mail::config::SecurityMode::Tls,
     };
     let smtp_security = match m.smtp_security.as_str() {
-        "starttls" => tokimo_mail::config::SecurityMode::StartTls,
-        "none" => tokimo_mail::config::SecurityMode::None,
-        _ => tokimo_mail::config::SecurityMode::Tls,
+        "starttls" => tokimo_package_mail::config::SecurityMode::StartTls,
+        "none" => tokimo_package_mail::config::SecurityMode::None,
+        _ => tokimo_package_mail::config::SecurityMode::Tls,
     };
 
-    tokimo_mail::MailAccountConfig {
+    tokimo_package_mail::MailAccountConfig {
         display_name: m.display_name.clone(),
         email: m.email.clone(),
         imap_host: m.imap_host.clone(),

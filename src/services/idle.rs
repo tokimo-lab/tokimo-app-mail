@@ -58,7 +58,7 @@ async fn run_manager(db: DatabaseConnection, event_tx: Box<dyn EventBroadcaster>
 async fn run_account_idle(
     db: DatabaseConnection,
     event_tx: Box<dyn EventBroadcaster>,
-    cfg: tokimo_mail::MailAccountConfig,
+    cfg: tokimo_package_mail::MailAccountConfig,
     account_id: Uuid,
 ) {
     let mut backoff = Duration::from_secs(5);
@@ -100,8 +100,8 @@ async fn run_account_idle(
     }
 }
 
-async fn do_idle_cycle(cfg: &tokimo_mail::MailAccountConfig) -> Result<bool, tokimo_mail::MailError> {
-    let mut session = tokimo_mail::MailSession::connect(cfg).await?;
+async fn do_idle_cycle(cfg: &tokimo_package_mail::MailAccountConfig) -> Result<bool, tokimo_package_mail::MailError> {
+    let mut session = tokimo_package_mail::MailSession::connect(cfg).await?;
     session.open_folder("INBOX").await?;
     let (session, new_data) = session.into_idle_wait(2 * 60).await?;
     session.logout().await;
@@ -110,7 +110,7 @@ async fn do_idle_cycle(cfg: &tokimo_mail::MailAccountConfig) -> Result<bool, tok
 
 async fn forward_sync_inbox(
     db: &DatabaseConnection,
-    cfg: &tokimo_mail::MailAccountConfig,
+    cfg: &tokimo_package_mail::MailAccountConfig,
     account_id: Uuid,
     folder: &mail_folders::Model,
     event_tx: &dyn EventBroadcaster,
@@ -120,7 +120,7 @@ async fn forward_sync_inbox(
         return Ok(0);
     };
 
-    let mut imap = tokimo_mail::MailSession::connect(cfg)
+    let mut imap = tokimo_package_mail::MailSession::connect(cfg)
         .await
         .map_err(|e| AppError::Internal(format!("IDLE sync connect: {e}")))?;
 

@@ -107,7 +107,7 @@ pub struct DetectProviderQuery {
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
 pub async fn list_providers() -> impl IntoResponse {
-    let presets = tokimo_mail::provider::all_provider_presets();
+    let presets = tokimo_package_mail::provider::all_provider_presets();
     let output: Vec<MailProviderPresetOutput> = presets
         .into_iter()
         .map(|p| MailProviderPresetOutput {
@@ -129,7 +129,7 @@ pub async fn list_providers() -> impl IntoResponse {
 }
 
 pub async fn detect_provider(Query(q): Query<DetectProviderQuery>) -> impl IntoResponse {
-    let preset = tokimo_mail::provider::detect_provider(&q.email);
+    let preset = tokimo_package_mail::provider::detect_provider(&q.email);
     match preset {
         Some(p) => ok(Some(MailProviderPresetOutput {
             provider: format!("{:?}", p.provider).to_lowercase(),
