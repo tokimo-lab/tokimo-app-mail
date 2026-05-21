@@ -172,16 +172,19 @@ pub async fn run_accounts(auth: TokimoAuthArgs, cmd: AccountsCmd) -> anyhow::Res
             let (imap_h, smtp_h, provider) = if let (Some(ih), Some(sh)) = (&imap_host, &smtp_host) {
                 (ih.clone(), sh.clone(), "custom".to_string())
             } else if let Some(preset) = tokimo_package_mail::provider::detect_provider(&email) {
-                (preset.imap_host, preset.smtp_host, format!("{:?}", preset.provider).to_lowercase())
+                (
+                    preset.imap_host,
+                    preset.smtp_host,
+                    format!("{:?}", preset.provider).to_lowercase(),
+                )
             } else {
-                anyhow::bail!("Cannot auto-detect provider for '{}'. Use --imap-host and --smtp-host.", email);
+                anyhow::bail!(
+                    "Cannot auto-detect provider for '{}'. Use --imap-host and --smtp-host.",
+                    email
+                );
             };
 
-            let display_name = if name.is_empty() {
-                email.clone()
-            } else {
-                name
-            };
+            let display_name = if name.is_empty() { email.clone() } else { name };
 
             let body = crate::handlers::accounts::CreateAccountBody {
                 display_name,
@@ -293,8 +296,15 @@ pub async fn run_messages(auth: TokimoAuthArgs, account: String, cmd: MessagesCm
                 }
                 println!("{:<8}  {:<20}  {:<4}  {:<30}  Subject", "ID", "Date", "Read", "From");
                 for m in &messages {
-                    let from = parse_addrs_json(&m.from_addrs).into_iter().next().map(|a| a.address).unwrap_or_else(|| "(no sender)".into());
-                    let date = m.date.map(|d| d.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string()).unwrap_or_else(|| "-".into());
+                    let from = parse_addrs_json(&m.from_addrs)
+                        .into_iter()
+                        .next()
+                        .map(|a| a.address)
+                        .unwrap_or_else(|| "(no sender)".into());
+                    let date = m
+                        .date
+                        .map(|d| d.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string())
+                        .unwrap_or_else(|| "-".into());
                     let read = if m.is_read { "Y" } else { "N" };
                     println!("{:<8}  {:<20}  {:<4}  {:<30}  {}", m.id, date, read, from, m.subject);
                 }
@@ -316,7 +326,11 @@ pub async fn run_messages(auth: TokimoAuthArgs, account: String, cmd: MessagesCm
                 let read = if m.is_read { "Y" } else { "N" };
                 println!("{:<8}  {:<20}  {:<4}  {:<30}  {}", m.id, date, read, from, m.subject);
             }
-            let showing = format!("{}-{}", first_msg_offset + 1, first_msg_offset + result.messages.len() as u32);
+            let showing = format!(
+                "{}-{}",
+                first_msg_offset + 1,
+                first_msg_offset + result.messages.len() as u32
+            );
             println!("\nShowing {showing} of {imap_total} messages (page {page})");
         }
         MessagesCmd::Read { message_id } => {
@@ -392,15 +406,12 @@ pub async fn run_send(
 
     let mut attachments = Vec::new();
     for path in &attachment_paths {
-        let data = std::fs::read(path)
-            .with_context(|| format!("failed to read attachment: {}", path.display()))?;
+        let data = std::fs::read(path).with_context(|| format!("failed to read attachment: {}", path.display()))?;
         let filename = path
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
             .unwrap_or_else(|| "attachment".into());
-        let content_type = mime_guess::from_path(path)
-            .first_or_octet_stream()
-            .to_string();
+        let content_type = mime_guess::from_path(path).first_or_octet_stream().to_string();
         attachments.push(tokimo_package_mail::message::ComposeAttachment {
             filename,
             content_type,

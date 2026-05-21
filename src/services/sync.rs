@@ -183,10 +183,7 @@ pub async fn list_page_from_imap(
     }
 
     let seq_range = format!("{start}:{end}");
-    let summaries = imap
-        .fetch_summaries_by_seq(&seq_range)
-        .await
-        .unwrap_or_default();
+    let summaries = imap.fetch_summaries_by_seq(&seq_range).await.unwrap_or_default();
 
     // Store to DB so messages have PKs.
     store_summaries_batch(db, account.id, &folder, &summaries).await?;

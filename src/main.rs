@@ -140,12 +140,24 @@ async fn main() -> anyhow::Result<()> {
                     html,
                     in_reply_to,
                     attachment,
-                } => cli::run_send(auth, require_account()?, to, cc, subject, body, html, in_reply_to, attachment).await,
+                } => {
+                    cli::run_send(
+                        auth,
+                        require_account()?,
+                        to,
+                        cc,
+                        subject,
+                        body,
+                        html,
+                        in_reply_to,
+                        attachment,
+                    )
+                    .await
+                }
                 Command::Sync => cli::run_sync(auth, require_account()?).await,
-                Command::Search {
-                    query,
-                    folder_id,
-                } => cli::run_search(auth, require_account()?, query, folder_id).await,
+                Command::Search { query, folder_id } => {
+                    cli::run_search(auth, require_account()?, query, folder_id).await
+                }
             };
             if let Err(error) = result {
                 eprintln!("Error: {error:#}");
