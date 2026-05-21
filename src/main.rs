@@ -31,6 +31,9 @@ use uuid::Uuid;
 struct Cli {
     #[command(flatten)]
     auth: TokimoAuthArgs,
+    /// 账户 ID 或邮箱地址
+    #[arg(long, global = true)]
+    account: Option<String>,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -45,25 +48,16 @@ enum Command {
     },
     /// 管理文件夹
     Folders {
-        /// 账户 ID 或邮箱地址
-        #[arg(long)]
-        account: String,
         #[command(subcommand)]
         cmd: cli::FoldersCmd,
     },
     /// 管理邮件
     Messages {
-        /// 账户 ID 或邮箱地址
-        #[arg(long)]
-        account: String,
         #[command(subcommand)]
         cmd: cli::MessagesCmd,
     },
     /// 发送邮件
     Send {
-        /// 账户 ID 或邮箱地址
-        #[arg(long)]
-        account: String,
         /// 收件人（可多个）
         #[arg(long)]
         to: Vec<String>,
@@ -87,16 +81,9 @@ enum Command {
         attachment: Vec<PathBuf>,
     },
     /// 同步账户邮件（文件夹 + 邮件）
-    Sync {
-        /// 账户 ID 或邮箱地址
-        #[arg(long)]
-        account: String,
-    },
+    Sync,
     /// 搜索邮件
     Search {
-        /// 账户 ID 或邮箱地址
-        #[arg(long)]
-        account: String,
         /// 搜索关键词
         query: String,
         /// 限定文件夹 ID
@@ -107,7 +94,7 @@ enum Command {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let Cli { auth, command } = Cli::parse();
+    let Cli { auth, account, command } = Cli::parse();
 
     match command {
         None if std::env::var_os("TOKIMO_BUS_SOCKET").is_some() => {
@@ -129,6 +116,9 @@ async fn main() -> anyhow::Result<()> {
             std::process::exit(0);
         }
         Some(cmd) => {
+            let require_account = || -> anyhow::Result<String> {
+                account.ok_or_else(|| anyhow::anyhow!("--account is required (account ID or email address)"))
+            };
             let result = match cmd {
                 Command::Accounts { cmd: None } => {
                     use clap::CommandFactory;
@@ -140,10 +130,9 @@ async fn main() -> anyhow::Result<()> {
                     std::process::exit(0);
                 }
                 Command::Accounts { cmd: Some(c) } => cli::run_accounts(auth, c).await,
-                Command::Folders { account, cmd } => cli::run_folders(auth, account, cmd).await,
-                Command::Messages { account, cmd } => cli::run_messages(auth, account, cmd).await,
+                Command::Folders { cmd } => cli::run_folders(auth, require_account()?, cmd).await,
+                Command::Messages { cmd } => cli::run_messages(auth, require_account()?, cmd).await,
                 Command::Send {
-                    account,
                     to,
                     cc,
                     subject,
@@ -151,13 +140,12 @@ async fn main() -> anyhow::Result<()> {
                     html,
                     in_reply_to,
                     attachment,
-                } => cli::run_send(auth, account, to, cc, subject, body, html, in_reply_to, attachment).await,
-                Command::Sync { account } => cli::run_sync(auth, account).await,
+                } => cli::run_send(auth, require_account()?, to, cc, subject, body, html, in_reply_to, attachment).await,
+                Command::Sync => cli::run_sync(auth, require_account()?).await,
                 Command::Search {
-                    account,
                     query,
                     folder_id,
-                } => cli::run_search(auth, account, query, folder_id).await,
+                } => cli::run_search(auth, require_account()?, query, folder_id).await,
             };
             if let Err(error) = result {
                 eprintln!("Error: {error:#}");
