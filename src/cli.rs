@@ -390,6 +390,7 @@ pub async fn run_messages(auth: TokimoAuthArgs, account: String, cmd: MessagesCm
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_send(
     auth: TokimoAuthArgs,
     account: String,
@@ -476,10 +477,10 @@ pub async fn run_search(
     let account_id = resolve_account(&db, user_id, &account).await?;
 
     // Quick forward-sync INBOX so search reflects latest IMAP state.
-    if let Ok(folders) = repos::folders::list_by_account(&db, account_id).await {
-        if let Some(inbox) = folders.iter().find(|f| f.folder_type == "inbox") {
-            let _ = services::sync::quick_sync_folder(&db, user_id, inbox.id).await;
-        }
+    if let Ok(folders) = repos::folders::list_by_account(&db, account_id).await
+        && let Some(inbox) = folders.iter().find(|f| f.folder_type == "inbox")
+    {
+        let _ = services::sync::quick_sync_folder(&db, user_id, inbox.id).await;
     }
 
     let result = services::messages::search_messages(&db, user_id, account_id, &query).await?;
@@ -514,10 +515,10 @@ async fn init(auth: TokimoAuthArgs) -> anyhow::Result<(DatabaseConnection, Uuid)
 /// Resolve an account identifier (UUID or email address) to a UUID.
 async fn resolve_account(db: &DatabaseConnection, user_id: Uuid, account: &str) -> anyhow::Result<Uuid> {
     // Try UUID first.
-    if let Ok(id) = account.parse::<Uuid>() {
-        if repos::accounts::find_by_id_and_user(db, id, user_id).await?.is_some() {
-            return Ok(id);
-        }
+    if let Ok(id) = account.parse::<Uuid>()
+        && repos::accounts::find_by_id_and_user(db, id, user_id).await?.is_some()
+    {
+        return Ok(id);
     }
     // Fall back to email lookup.
     if let Some(a) = repos::accounts::find_by_email_and_user(db, account, user_id).await? {
