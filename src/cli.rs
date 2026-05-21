@@ -87,27 +87,27 @@ pub enum MessagesCmd {
     },
     /// 读取邮件全文
     Read {
-        /// 邮件 UUID 或 IMAP UID
+        /// 邮件 ID（`messages list` 输出的第一列）
         message_id: String,
     },
     /// 标记为已读
     MarkRead {
-        /// 邮件 UUID 或 IMAP UID（可多个）
+        /// 邮件 ID（可多个）
         message_ids: Vec<String>,
     },
     /// 标记为未读
     MarkUnread {
-        /// 邮件 UUID 或 IMAP UID（可多个）
+        /// 邮件 ID（可多个）
         message_ids: Vec<String>,
     },
     /// 删除邮件
     Delete {
-        /// 邮件 UUID 或 IMAP UID（可多个）
+        /// 邮件 ID（可多个）
         message_ids: Vec<String>,
     },
     /// 移动邮件到其他文件夹
     Move {
-        /// 邮件 UUID 或 IMAP UID（可多个）
+        /// 邮件 ID（可多个）
         message_ids: Vec<String>,
         /// 目标文件夹 ID
         #[arg(long)]
@@ -284,22 +284,22 @@ pub async fn run_messages(auth: TokimoAuthArgs, account: String, cmd: MessagesCm
 
             let first_msg_offset = (page - 1) * page_size;
 
-            // If the requested page is beyond DB range, fetch directly from IMAP.
+            // If the requested page is beyond DB range, fetch from IMAP and store to DB.
             if first_msg_offset >= db_total && imap_total > 0 {
-                let summaries = services::sync::list_page_from_imap(user_id, folder_id, page, page_size, &db).await?;
-                if summaries.is_empty() {
+                let messages = services::sync::list_page_from_imap(user_id, folder_id, page, page_size, &db).await?;
+                if messages.is_empty() {
                     println!("No messages in this folder.");
                     return Ok(());
                 }
-                println!("{:<8}  {:<20}  {:<4}  {:<30}  Subject", "UID", "Date", "Read", "From");
-                for s in &summaries {
-                    let from = s.from.first().map(|a| a.address.as_str()).unwrap_or("(no sender)");
-                    let date = s.date.map(|d| d.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string()).unwrap_or_else(|| "-".into());
-                    let read = if s.flags.iter().any(|f| f.eq_ignore_ascii_case("\\Seen")) { "Y" } else { "N" };
-                    println!("{:<8}  {:<20}  {:<4}  {:<30}  {}", s.uid, date, read, from, s.subject);
+                println!("{:<8}  {:<20}  {:<4}  {:<30}  Subject", "ID", "Date", "Read", "From");
+                for m in &messages {
+                    let from = parse_addrs_json(&m.from_addrs).into_iter().next().map(|a| a.address).unwrap_or_else(|| "(no sender)".into());
+                    let date = m.date.map(|d| d.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string()).unwrap_or_else(|| "-".into());
+                    let read = if m.is_read { "Y" } else { "N" };
+                    println!("{:<8}  {:<20}  {:<4}  {:<30}  {}", m.id, date, read, from, m.subject);
                 }
-                let showing = format!("{}-{}", first_msg_offset + 1, first_msg_offset + summaries.len() as u32);
-                println!("\nShowing {showing} of {imap_total} messages (page {page}) [from IMAP]");
+                let showing = format!("{}-{}", first_msg_offset + 1, first_msg_offset + messages.len() as u32);
+                println!("\nShowing {showing} of {imap_total} messages (page {page})");
                 return Ok(());
             }
 
@@ -309,12 +309,12 @@ pub async fn run_messages(auth: TokimoAuthArgs, account: String, cmd: MessagesCm
                 println!("No messages in this folder.");
                 return Ok(());
             }
-            println!("{:<8}  {:<20}  {:<4}  {:<30}  Subject", "UID", "Date", "Read", "From");
+            println!("{:<8}  {:<20}  {:<4}  {:<30}  Subject", "ID", "Date", "Read", "From");
             for m in &result.messages {
                 let from = m.from.first().map(|a| a.address.as_str()).unwrap_or("(no sender)");
                 let date = m.date.as_deref().map(format_date_local).unwrap_or_else(|| "-".into());
                 let read = if m.is_read { "Y" } else { "N" };
-                println!("{:<8}  {:<20}  {:<4}  {:<30}  {}", m.uid, date, read, from, m.subject);
+                println!("{:<8}  {:<20}  {:<4}  {:<30}  {}", m.id, date, read, from, m.subject);
             }
             let showing = format!("{}-{}", first_msg_offset + 1, first_msg_offset + result.messages.len() as u32);
             println!("\nShowing {showing} of {imap_total} messages (page {page})");
@@ -515,26 +515,21 @@ async fn resolve_account(db: &DatabaseConnection, user_id: Uuid, account: &str) 
     anyhow::bail!("Account '{account}' not found. Run `accounts list` to see available accounts.");
 }
 
-/// Resolve a message identifier (auto-increment ID or IMAP UID) to an i32 message ID.
+/// Resolve a database message PK.
 async fn resolve_message_id(
     db: &DatabaseConnection,
-    account_id: Uuid,
+    _account_id: Uuid,
     raw: &str,
-    folder_id: Option<Uuid>,
+    _folder_id: Option<Uuid>,
 ) -> anyhow::Result<i32> {
     let id: i32 = raw
         .parse()
         .map_err(|_| anyhow::anyhow!("'{raw}' is not a valid message ID"))?;
 
-    // Check if it's a direct PK hit.
-    if repos::messages::find_by_id(db, id).await?.is_some() {
-        return Ok(id);
-    }
-
-    // Otherwise treat as IMAP UID.
-    repos::messages::find_id_by_uid(db, account_id, id, folder_id)
+    repos::messages::find_by_id(db, id)
         .await?
-        .ok_or_else(|| anyhow::anyhow!("No message with ID or UID {id} found"))
+        .map(|m| m.id)
+        .ok_or_else(|| anyhow::anyhow!("No message with ID {id} found"))
 }
 
 /// Resolve multiple message identifiers to i32 IDs.
@@ -556,6 +551,10 @@ fn format_date_local(date_str: &str) -> String {
     chrono::DateTime::parse_from_rfc3339(date_str)
         .map(|dt| dt.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string())
         .unwrap_or_else(|_| date_str.get(..16).unwrap_or(date_str).replace('T', " "))
+}
+
+fn parse_addrs_json(json: &serde_json::Value) -> Vec<crate::handlers::messages::MailAddressOutput> {
+    serde_json::from_value(json.clone()).unwrap_or_default()
 }
 
 fn format_addrs(addrs: &[crate::handlers::messages::MailAddressOutput]) -> String {

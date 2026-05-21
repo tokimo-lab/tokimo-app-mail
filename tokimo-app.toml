@@ -18,3 +18,7 @@ image        = "icon.png"
 color        = "#3b82f6"
 width        = 1200
 height       = 800
+
+[cli]
+name = "tokimo-app-mail"
+description = "Read and manage user emails with full operational support (read, send, etc.)."

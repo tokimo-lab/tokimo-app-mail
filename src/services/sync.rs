@@ -4,7 +4,7 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use super::accounts::account_to_config;
-use crate::db::entities::{mail_accounts, mail_folders};
+use crate::db::entities::{mail_accounts, mail_folders, mail_messages};
 use crate::error::AppError;
 use crate::repos;
 
@@ -122,7 +122,7 @@ pub async fn quick_sync_folder(
         // First time — grab the latest 200.
         let start = total.saturating_sub(199);
         let seq_range = format!("{start}:{total}");
-        if let Ok(summaries) = imap.fetch_summaries_by_uids(&seq_range).await {
+        if let Ok(summaries) = imap.fetch_summaries_by_seq(&seq_range).await {
             store_summaries_batch(db, account.id, &folder, &summaries).await?;
         }
     }
@@ -150,7 +150,7 @@ pub async fn list_page_from_imap(
     page: u32,
     page_size: u32,
     db: &DatabaseConnection,
-) -> Result<Vec<tokimo_mail::message::MailMessageSummary>, AppError> {
+) -> Result<Vec<mail_messages::Model>, AppError> {
     let folder = repos::folders::find_by_id(db, folder_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Folder not found".into()))?;
@@ -188,8 +188,13 @@ pub async fn list_page_from_imap(
         .await
         .unwrap_or_default();
 
+    // Store to DB so messages have PKs.
+    store_summaries_batch(db, account.id, &folder, &summaries).await?;
     imap.logout().await;
-    Ok(summaries)
+
+    // Query back from DB to get PKs.
+    let (messages, _) = repos::messages::list_by_folder(db, folder_id, page, page_size).await?;
+    Ok(messages)
 }
 
 async fn sync_folder_messages(
@@ -259,7 +264,7 @@ async fn sync_folder_messages(
         if total > 0 {
             let start = total.saturating_sub(199);
             let seq_range = format!("{start}:{total}");
-            match imap.fetch_summaries_by_uids(&seq_range).await {
+            match imap.fetch_summaries_by_seq(&seq_range).await {
                 Ok(summaries) => {
                     store_summaries_batch(db, account_id, folder, &summaries).await?;
                 }

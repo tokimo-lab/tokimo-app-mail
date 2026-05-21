@@ -90,45 +90,6 @@ pub async fn exists_by_uid(
     Ok(count > 0)
 }
 
-/// Find a message ID by IMAP UID, optionally scoped to a folder.
-/// If `folder_id` is provided, searches that folder first; falls back to all folders.
-/// Returns an error if UID matches multiple messages across different folders.
-pub async fn find_id_by_uid(
-    db: &DatabaseConnection,
-    account_id: Uuid,
-    uid: i32,
-    folder_id: Option<Uuid>,
-) -> Result<Option<i32>, AppError> {
-    if let Some(fid) = folder_id {
-        let model = mail_messages::Entity::find()
-            .filter(mail_messages::Column::AccountId.eq(account_id))
-            .filter(mail_messages::Column::FolderId.eq(fid))
-            .filter(mail_messages::Column::Uid.eq(uid))
-            .one(db)
-            .await
-            .map_err(AppError::Database)?;
-        if model.is_some() {
-            return Ok(model.map(|m| m.id));
-        }
-    }
-
-    let models: Vec<_> = mail_messages::Entity::find()
-        .filter(mail_messages::Column::AccountId.eq(account_id))
-        .filter(mail_messages::Column::Uid.eq(uid))
-        .all(db)
-        .await
-        .map_err(AppError::Database)?;
-
-    match models.len() {
-        0 => Ok(None),
-        1 => Ok(Some(models.into_iter().next().unwrap().id)),
-        _ => Err(AppError::Internal(format!(
-            "UID {uid} matches {} messages in different folders. Use message ID instead.",
-            models.len()
-        ))),
-    }
-}
-
 pub async fn existing_uids_in_folder(
     db: &DatabaseConnection,
     account_id: Uuid,
