@@ -19,6 +19,24 @@ pub async fn init_pool() -> anyhow::Result<DatabaseConnection> {
 }
 
 pub async fn init_schema(db: &DatabaseConnection) -> anyhow::Result<()> {
+    // Migration: drop old UUID-based messages/attachments in mail schema if present.
+    db.execute_raw(Statement::from_string(
+        DatabaseBackend::Postgres,
+        r#"DO $$
+        BEGIN
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = 'mail' AND table_name = 'mail_messages'
+                  AND column_name = 'id' AND data_type = 'uuid'
+            ) THEN
+                DROP TABLE IF EXISTS mail.mail_attachments CASCADE;
+                DROP TABLE IF EXISTS mail.mail_messages CASCADE;
+            END IF;
+        END$$"#
+            .to_string(),
+    ))
+    .await?;
+
     let ddl = [
         format!(r#"CREATE SCHEMA IF NOT EXISTS "{SCHEMA}""#),
         // mail_accounts
@@ -70,7 +88,7 @@ pub async fn init_schema(db: &DatabaseConnection) -> anyhow::Result<()> {
         // mail_messages
         format!(
             r#"CREATE TABLE IF NOT EXISTS "{SCHEMA}".mail_messages (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                id SERIAL PRIMARY KEY,
                 account_id UUID NOT NULL REFERENCES "{SCHEMA}".mail_accounts(id) ON DELETE CASCADE,
                 folder_id UUID NOT NULL REFERENCES "{SCHEMA}".mail_folders(id) ON DELETE CASCADE,
                 uid INT NOT NULL,
@@ -100,8 +118,8 @@ pub async fn init_schema(db: &DatabaseConnection) -> anyhow::Result<()> {
         // mail_attachments
         format!(
             r#"CREATE TABLE IF NOT EXISTS "{SCHEMA}".mail_attachments (
-                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                message_id UUID NOT NULL REFERENCES "{SCHEMA}".mail_messages(id) ON DELETE CASCADE,
+                id SERIAL PRIMARY KEY,
+                message_id INT NOT NULL REFERENCES "{SCHEMA}".mail_messages(id) ON DELETE CASCADE,
                 filename TEXT NOT NULL,
                 content_type TEXT NOT NULL,
                 size INT NOT NULL DEFAULT 0,
@@ -128,6 +146,34 @@ pub async fn init_schema(db: &DatabaseConnection) -> anyhow::Result<()> {
         db.execute_raw(Statement::from_string(DatabaseBackend::Postgres, sql))
             .await?;
     }
+
+    // Migrate accounts+folders from public → mail if public has data and mail is empty.
+    db.execute_raw(Statement::from_string(
+        DatabaseBackend::Postgres,
+        r#"DO $$
+        BEGIN
+            IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='mail_accounts')
+               AND NOT EXISTS (SELECT 1 FROM mail.mail_accounts LIMIT 1)
+            THEN
+                INSERT INTO mail.mail_accounts
+                    (id, user_id, display_name, email, provider, imap_host, imap_port, imap_security,
+                     imap_username, imap_password, smtp_host, smtp_port, smtp_security, smtp_username,
+                     smtp_password, sender_name, is_enabled, sync_interval, last_sync_at, created_at, updated_at)
+                SELECT id, user_id, display_name, email, provider, imap_host, imap_port, imap_security,
+                     imap_username, imap_password, smtp_host, smtp_port, smtp_security, smtp_username,
+                     smtp_password, sender_name, is_enabled, sync_interval, last_sync_at, created_at, updated_at
+                FROM public.mail_accounts;
+                INSERT INTO mail.mail_folders
+                    (id, account_id, name, delimiter, folder_type, attributes, total_count, unread_count,
+                     uid_validity, uid_next, sort_order, history_sync_cursor, updated_at)
+                SELECT id, account_id, name, delimiter, folder_type, attributes, total_count, unread_count,
+                     uid_validity, uid_next, sort_order, history_sync_cursor, updated_at
+                FROM public.mail_folders;
+            END IF;
+        END$$"#
+            .to_string(),
+    ))
+    .await?;
 
     Ok(())
 }

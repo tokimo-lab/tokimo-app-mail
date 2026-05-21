@@ -19,7 +19,7 @@ pub async fn run_cycle(db: &DatabaseConnection) -> Result<(), AppError> {
 
     debug!("Body fetch: {} messages need body fetching", unfetched.len());
 
-    let mut by_account: HashMap<Uuid, Vec<(Uuid, Uuid, i32)>> = HashMap::new();
+    let mut by_account: HashMap<Uuid, Vec<(i32, Uuid, i32)>> = HashMap::new();
     for (msg_id, folder_id, uid, account_id) in &unfetched {
         by_account
             .entry(*account_id)
@@ -39,7 +39,7 @@ pub async fn run_cycle(db: &DatabaseConnection) -> Result<(), AppError> {
 async fn fetch_for_account(
     db: &DatabaseConnection,
     account_id: Uuid,
-    messages: Vec<(Uuid, Uuid, i32)>,
+    messages: Vec<(i32, Uuid, i32)>,
 ) -> Result<(), AppError> {
     let account = repos::accounts::find_by_id(db, account_id)
         .await?
@@ -66,7 +66,7 @@ async fn fetch_for_account(
         map
     };
 
-    let mut by_folder: HashMap<Uuid, Vec<(Uuid, i32)>> = HashMap::new();
+    let mut by_folder: HashMap<Uuid, Vec<(i32, i32)>> = HashMap::new();
     for (msg_id, folder_id, uid) in messages {
         by_folder.entry(folder_id).or_default().push((msg_id, uid));
     }

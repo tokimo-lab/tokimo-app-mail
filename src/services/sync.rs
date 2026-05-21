@@ -83,6 +83,115 @@ pub async fn sync_account(
     Ok(())
 }
 
+/// Quick forward-sync a single folder — only fetches new messages since max_uid.
+/// Skips history backfill / reconcile / flag sync. Suitable for CLI pre-list sync.
+/// Returns (imap_total, db_total) so the caller can detect gaps.
+pub async fn quick_sync_folder(
+    db: &DatabaseConnection,
+    user_id: Uuid,
+    folder_id: Uuid,
+) -> Result<(u32, u32), AppError> {
+    let folder = repos::folders::find_by_id(db, folder_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Folder not found".into()))?;
+
+    let account = repos::accounts::find_by_id_and_user(db, folder.account_id, user_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Account not found".into()))?;
+
+    let cfg = account_to_config(&account);
+    let mut imap = tokimo_mail::MailSession::connect(&cfg)
+        .await
+        .map_err(|e| AppError::Internal(format!("IMAP connect: {e}")))?;
+
+    let (total, _unseen, _uid_validity) = imap
+        .open_folder_ex(&folder.name)
+        .await
+        .map_err(|e| AppError::Internal(format!("IMAP SELECT '{}': {e}", folder.name)))?;
+
+    let max_uid = repos::messages::max_uid_in_folder(db, account.id, folder.id).await?;
+
+    if let Some(max_uid) = max_uid {
+        if total > 0 {
+            let uid_range = format!("{}:*", max_uid + 1);
+            if let Ok(summaries) = imap.fetch_summaries_by_uids(&uid_range).await {
+                store_summaries_batch(db, account.id, &folder, &summaries).await?;
+            }
+        }
+    } else if total > 0 {
+        // First time — grab the latest 200.
+        let start = total.saturating_sub(199);
+        let seq_range = format!("{start}:{total}");
+        if let Ok(summaries) = imap.fetch_summaries_by_uids(&seq_range).await {
+            store_summaries_batch(db, account.id, &folder, &summaries).await?;
+        }
+    }
+
+    imap.logout().await;
+
+    // Update unread count.
+    let unread = repos::messages::count_unread(db, folder.id).await?;
+    let db_total = repos::messages::count_in_folder(db, folder.id).await? as u32;
+    let mut active: mail_folders::ActiveModel = folder.into();
+    active.total_count = Set(total as i32);
+    active.unread_count = Set(unread as i32);
+    active.updated_at = Set(Utc::now().fixed_offset());
+    active.update(db).await?;
+
+    Ok((total, db_total))
+}
+
+/// Fetch a specific page of messages directly from IMAP (sequence-based).
+/// Returns summaries for the requested page without touching the DB.
+/// Used when the requested page is beyond what the DB has cached.
+pub async fn list_page_from_imap(
+    user_id: Uuid,
+    folder_id: Uuid,
+    page: u32,
+    page_size: u32,
+    db: &DatabaseConnection,
+) -> Result<Vec<tokimo_mail::message::MailMessageSummary>, AppError> {
+    let folder = repos::folders::find_by_id(db, folder_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Folder not found".into()))?;
+
+    let account = repos::accounts::find_by_id_and_user(db, folder.account_id, user_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Account not found".into()))?;
+
+    let cfg = account_to_config(&account);
+    let mut imap = tokimo_mail::MailSession::connect(&cfg)
+        .await
+        .map_err(|e| AppError::Internal(format!("IMAP connect: {e}")))?;
+
+    let (total, _, _) = imap
+        .open_folder_ex(&folder.name)
+        .await
+        .map_err(|e| AppError::Internal(format!("IMAP SELECT '{}': {e}", folder.name)))?;
+
+    if total == 0 {
+        imap.logout().await;
+        return Ok(Vec::new());
+    }
+
+    // IMAP sequences are 1-based, newest messages have the highest numbers.
+    let end = total.saturating_sub((page - 1) * page_size);
+    let start = Ord::max(end.saturating_sub(page_size - 1), 1);
+    if start > end {
+        imap.logout().await;
+        return Ok(Vec::new());
+    }
+
+    let seq_range = format!("{start}:{end}");
+    let summaries = imap
+        .fetch_summaries_by_seq(&seq_range)
+        .await
+        .unwrap_or_default();
+
+    imap.logout().await;
+    Ok(summaries)
+}
+
 async fn sync_folder_messages(
     db: &DatabaseConnection,
     cfg: &tokimo_mail::MailAccountConfig,
@@ -198,7 +307,7 @@ async fn sync_folder_messages(
             Ok(server_uids) => {
                 if let Some(ref rows) = local_msgs {
                     let server_set: std::collections::HashSet<i32> = server_uids.iter().map(|&u| u as i32).collect();
-                    let stale_ids: Vec<Uuid> = rows
+                    let stale_ids: Vec<i32> = rows
                         .iter()
                         .filter(|(_, uid, _)| !server_set.contains(uid))
                         .map(|(id, _, _)| *id)
@@ -351,7 +460,7 @@ async fn sync_flags_session(
     cfg: &tokimo_mail::MailAccountConfig,
     account_id: Uuid,
     folder: &mail_folders::Model,
-    prefetched: Option<Vec<(Uuid, i32, bool)>>,
+    prefetched: Option<Vec<(i32, i32, bool)>>,
 ) -> Result<(Vec<i32>, Vec<i32>), AppError> {
     let local_msgs = match prefetched {
         Some(v) if !v.is_empty() => v,

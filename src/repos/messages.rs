@@ -66,7 +66,7 @@ pub async fn list_by_folder(
     Ok((messages, total))
 }
 
-pub async fn find_by_id(db: &DatabaseConnection, id: Uuid) -> Result<Option<mail_messages::Model>, AppError> {
+pub async fn find_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<mail_messages::Model>, AppError> {
     mail_messages::Entity::find_by_id(id)
         .one(db)
         .await
@@ -88,6 +88,45 @@ pub async fn exists_by_uid(
         .await
         .map_err(AppError::Database)?;
     Ok(count > 0)
+}
+
+/// Find a message ID by IMAP UID, optionally scoped to a folder.
+/// If `folder_id` is provided, searches that folder first; falls back to all folders.
+/// Returns an error if UID matches multiple messages across different folders.
+pub async fn find_id_by_uid(
+    db: &DatabaseConnection,
+    account_id: Uuid,
+    uid: i32,
+    folder_id: Option<Uuid>,
+) -> Result<Option<i32>, AppError> {
+    if let Some(fid) = folder_id {
+        let model = mail_messages::Entity::find()
+            .filter(mail_messages::Column::AccountId.eq(account_id))
+            .filter(mail_messages::Column::FolderId.eq(fid))
+            .filter(mail_messages::Column::Uid.eq(uid))
+            .one(db)
+            .await
+            .map_err(AppError::Database)?;
+        if model.is_some() {
+            return Ok(model.map(|m| m.id));
+        }
+    }
+
+    let models: Vec<_> = mail_messages::Entity::find()
+        .filter(mail_messages::Column::AccountId.eq(account_id))
+        .filter(mail_messages::Column::Uid.eq(uid))
+        .all(db)
+        .await
+        .map_err(AppError::Database)?;
+
+    match models.len() {
+        0 => Ok(None),
+        1 => Ok(Some(models.into_iter().next().unwrap().id)),
+        _ => Err(AppError::Internal(format!(
+            "UID {uid} matches {} messages in different folders. Use message ID instead.",
+            models.len()
+        ))),
+    }
 }
 
 pub async fn existing_uids_in_folder(
@@ -120,11 +159,20 @@ pub async fn count_unread(db: &DatabaseConnection, folder_id: Uuid) -> Result<i6
     Ok(count as i64)
 }
 
+pub async fn count_in_folder(db: &DatabaseConnection, folder_id: Uuid) -> Result<i64, AppError> {
+    let count = mail_messages::Entity::find()
+        .filter(mail_messages::Column::FolderId.eq(folder_id))
+        .count(db)
+        .await
+        .map_err(AppError::Database)?;
+    Ok(count as i64)
+}
+
 pub async fn list_uids_in_folder(
     db: &DatabaseConnection,
     account_id: Uuid,
     folder_id: Uuid,
-) -> Result<Vec<(Uuid, i32, bool)>, AppError> {
+) -> Result<Vec<(i32, i32, bool)>, AppError> {
     mail_messages::Entity::find()
         .filter(mail_messages::Column::AccountId.eq(account_id))
         .filter(mail_messages::Column::FolderId.eq(folder_id))
@@ -132,7 +180,7 @@ pub async fn list_uids_in_folder(
         .column(mail_messages::Column::Id)
         .column(mail_messages::Column::Uid)
         .column(mail_messages::Column::IsRead)
-        .into_tuple::<(Uuid, i32, bool)>()
+        .into_tuple::<(i32, i32, bool)>()
         .all(db)
         .await
         .map_err(AppError::Database)
@@ -185,11 +233,10 @@ pub async fn create(
     has_attachments: bool,
     size: i32,
 ) -> Result<mail_messages::Model, AppError> {
-    let id = Uuid::new_v4();
     let now = chrono::Utc::now().fixed_offset();
 
     let model = mail_messages::ActiveModel {
-        id: Set(id),
+        id: NotSet,
         account_id: Set(account_id),
         folder_id: Set(folder_id),
         uid: Set(uid),
@@ -220,7 +267,7 @@ pub async fn create(
         .map_err(AppError::Database)
 }
 
-pub async fn update_read_status(db: &DatabaseConnection, ids: &[Uuid], is_read: bool) -> Result<(), AppError> {
+pub async fn update_read_status(db: &DatabaseConnection, ids: &[i32], is_read: bool) -> Result<(), AppError> {
     if ids.is_empty() {
         return Ok(());
     }
@@ -233,7 +280,7 @@ pub async fn update_read_status(db: &DatabaseConnection, ids: &[Uuid], is_read: 
     Ok(())
 }
 
-pub async fn delete_many(db: &DatabaseConnection, ids: &[Uuid]) -> Result<(), AppError> {
+pub async fn delete_many(db: &DatabaseConnection, ids: &[i32]) -> Result<(), AppError> {
     if ids.is_empty() {
         return Ok(());
     }
@@ -255,7 +302,7 @@ pub async fn delete_all_in_folder(db: &DatabaseConnection, account_id: Uuid, fol
     Ok(res.rows_affected)
 }
 
-pub async fn reset_body_fetched(db: &DatabaseConnection, id: Uuid) -> Result<(), AppError> {
+pub async fn reset_body_fetched(db: &DatabaseConnection, id: i32) -> Result<(), AppError> {
     mail_messages::Entity::update_many()
         .filter(mail_messages::Column::Id.eq(id))
         .col_expr(mail_messages::Column::BodyFetched, Expr::value(false))
@@ -268,7 +315,7 @@ pub async fn reset_body_fetched(db: &DatabaseConnection, id: Uuid) -> Result<(),
     Ok(())
 }
 
-pub async fn move_to_folder(db: &DatabaseConnection, ids: &[Uuid], folder_id: Uuid) -> Result<(), AppError> {
+pub async fn move_to_folder(db: &DatabaseConnection, ids: &[i32], folder_id: Uuid) -> Result<(), AppError> {
     if ids.is_empty() {
         return Ok(());
     }
@@ -304,7 +351,7 @@ pub async fn search(
 
 pub async fn list_attachments(
     db: &DatabaseConnection,
-    message_id: Uuid,
+    message_id: i32,
 ) -> Result<Vec<mail_attachments::Model>, AppError> {
     mail_attachments::Entity::find()
         .filter(mail_attachments::Column::MessageId.eq(message_id))
@@ -315,15 +362,14 @@ pub async fn list_attachments(
 
 pub async fn create_attachment(
     db: &DatabaseConnection,
-    message_id: Uuid,
+    message_id: i32,
     filename: &str,
     content_type: &str,
     size: i32,
     data: Option<&str>,
 ) -> Result<mail_attachments::Model, AppError> {
-    let id = Uuid::new_v4();
     let model = mail_attachments::ActiveModel {
-        id: Set(id),
+        id: NotSet,
         message_id: Set(message_id),
         filename: Set(filename.to_string()),
         content_type: Set(content_type.to_string()),
@@ -342,7 +388,6 @@ pub async fn create_from_summary(
     folder_id: Uuid,
     s: &tokimo_mail::MailMessageSummary,
 ) -> Result<(), AppError> {
-    let id = Uuid::new_v4();
     let now = chrono::Utc::now().fixed_offset();
     let is_read = s.flags.iter().any(|f| f == "\\Seen");
     let is_flagged = s.flags.iter().any(|f| f == "\\Flagged");
@@ -351,7 +396,7 @@ pub async fn create_from_summary(
     let flags_json = serde_json::to_value(&s.flags).unwrap_or_default();
 
     let model = mail_messages::ActiveModel {
-        id: Set(id),
+        id: NotSet,
         account_id: Set(account_id),
         folder_id: Set(folder_id),
         uid: Set(s.uid as i32),
@@ -386,7 +431,7 @@ pub async fn create_from_summary(
 #[allow(clippy::too_many_arguments)]
 pub async fn update_body(
     db: &DatabaseConnection,
-    id: Uuid,
+    id: i32,
     text_body: Option<&str>,
     html_body: Option<&str>,
     preview: &str,
@@ -419,7 +464,7 @@ pub async fn update_body(
     Ok(())
 }
 
-pub async fn list_unfetched(db: &DatabaseConnection, limit: u64) -> Result<Vec<(Uuid, Uuid, i32, Uuid)>, AppError> {
+pub async fn list_unfetched(db: &DatabaseConnection, limit: u64) -> Result<Vec<(i32, Uuid, i32, Uuid)>, AppError> {
     let rows = mail_messages::Entity::find()
         .filter(mail_messages::Column::BodyFetched.eq(false))
         .filter(mail_messages::Column::TextBody.is_null())
@@ -433,7 +478,7 @@ pub async fn list_unfetched(db: &DatabaseConnection, limit: u64) -> Result<Vec<(
             mail_messages::Column::Uid,
             mail_messages::Column::AccountId,
         ])
-        .into_tuple::<(Uuid, Uuid, i32, Uuid)>()
+        .into_tuple::<(i32, Uuid, i32, Uuid)>()
         .all(db)
         .await
         .map_err(AppError::Database)?;

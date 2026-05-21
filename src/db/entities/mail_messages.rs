@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(schema_name = "mail", table_name = "mail_messages")]
 pub struct Model {
-    #[sea_orm(primary_key, auto_increment = false)]
-    pub id: Uuid,
+    #[sea_orm(primary_key, auto_increment = true)]
+    pub id: i32,
     pub account_id: Uuid,
     pub folder_id: Uuid,
     pub uid: i32,

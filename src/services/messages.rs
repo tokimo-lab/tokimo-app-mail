@@ -56,7 +56,7 @@ pub async fn list_messages(
 pub async fn get_message(
     db: &DatabaseConnection,
     user_id: Uuid,
-    message_id: Uuid,
+    message_id: i32,
 ) -> Result<MailMessageFullOutput, AppError> {
     let msg = repos::messages::find_by_id(db, message_id)
         .await?
@@ -150,30 +150,30 @@ pub async fn get_message(
 }
 
 pub async fn mark_read(db: &DatabaseConnection, user_id: Uuid, message_ids: &[String]) -> Result<(), AppError> {
-    let uuids = parse_uuids(message_ids)?;
-    repos::messages::update_read_status(db, &uuids, true).await?;
-    refresh_folder_unread_counts_for_messages(db, &uuids).await?;
-    spawn_imap_flag_update(db, user_id, &uuids, true).await;
+    let ids = parse_ids(message_ids)?;
+    repos::messages::update_read_status(db, &ids, true).await?;
+    refresh_folder_unread_counts_for_messages(db, &ids).await?;
+    spawn_imap_flag_update(db, user_id, &ids, true).await;
     Ok(())
 }
 
 pub async fn mark_unread(db: &DatabaseConnection, user_id: Uuid, message_ids: &[String]) -> Result<(), AppError> {
-    let uuids = parse_uuids(message_ids)?;
-    repos::messages::update_read_status(db, &uuids, false).await?;
-    refresh_folder_unread_counts_for_messages(db, &uuids).await?;
-    spawn_imap_flag_update(db, user_id, &uuids, false).await;
+    let ids = parse_ids(message_ids)?;
+    repos::messages::update_read_status(db, &ids, false).await?;
+    refresh_folder_unread_counts_for_messages(db, &ids).await?;
+    spawn_imap_flag_update(db, user_id, &ids, false).await;
     Ok(())
 }
 
 pub async fn delete_messages(db: &DatabaseConnection, _user_id: Uuid, message_ids: &[String]) -> Result<(), AppError> {
-    let uuids = parse_uuids(message_ids)?;
-    repos::messages::delete_many(db, &uuids).await
+    let ids = parse_ids(message_ids)?;
+    repos::messages::delete_many(db, &ids).await
 }
 
 pub async fn refetch_body(
     db: &DatabaseConnection,
     user_id: Uuid,
-    message_id: Uuid,
+    message_id: i32,
 ) -> Result<MailMessageFullOutput, AppError> {
     repos::messages::reset_body_fetched(db, message_id).await?;
     get_message(db, user_id, message_id).await
@@ -185,11 +185,11 @@ pub async fn move_messages(
     message_ids: &[String],
     target_folder_id: &str,
 ) -> Result<(), AppError> {
-    let uuids = parse_uuids(message_ids)?;
+    let ids = parse_ids(message_ids)?;
     let fid: Uuid = target_folder_id
         .parse()
         .map_err(|_| AppError::BadRequest("invalid folder id".into()))?;
-    repos::messages::move_to_folder(db, &uuids, fid).await
+    repos::messages::move_to_folder(db, &ids, fid).await
 }
 
 pub async fn send_message(
@@ -269,7 +269,7 @@ async fn fetch_message_body_now(
     db: &DatabaseConnection,
     cfg: &tokimo_mail::MailAccountConfig,
     folder_name: &str,
-    message_id: Uuid,
+    message_id: i32,
     uid: u32,
 ) -> Result<(), AppError> {
     let mut session = tokimo_mail::MailSession::connect(cfg)
@@ -348,7 +348,7 @@ async fn refresh_folder_unread_count(db: &DatabaseConnection, folder_id: Uuid) -
 
 async fn refresh_folder_unread_counts_for_messages(
     db: &DatabaseConnection,
-    message_ids: &[Uuid],
+    message_ids: &[i32],
 ) -> Result<(), AppError> {
     let mut folder_ids = std::collections::HashSet::new();
     for &id in message_ids {
@@ -362,9 +362,9 @@ async fn refresh_folder_unread_counts_for_messages(
     Ok(())
 }
 
-async fn spawn_imap_flag_update(db: &DatabaseConnection, user_id: Uuid, message_uuids: &[Uuid], mark_read: bool) {
+async fn spawn_imap_flag_update(db: &DatabaseConnection, user_id: Uuid, message_ids: &[i32], mark_read: bool) {
     let mut by_folder: std::collections::HashMap<(Uuid, Uuid), Vec<u32>> = std::collections::HashMap::new();
-    for &msg_id in message_uuids {
+    for &msg_id in message_ids {
         if let Ok(Some(msg)) = repos::messages::find_by_id(db, msg_id).await {
             by_folder
                 .entry((msg.account_id, msg.folder_id))
@@ -407,11 +407,11 @@ fn parse_addrs(json: &serde_json::Value) -> Vec<MailAddressOutput> {
     serde_json::from_value::<Vec<MailAddressOutput>>(json.clone()).unwrap_or_default()
 }
 
-fn parse_uuids(ids: &[String]) -> Result<Vec<Uuid>, AppError> {
+fn parse_ids(ids: &[String]) -> Result<Vec<i32>, AppError> {
     ids.iter()
         .map(|s| {
-            s.parse::<Uuid>()
-                .map_err(|_| AppError::BadRequest(format!("invalid id: {s}")))
+            s.parse::<i32>()
+                .map_err(|_| AppError::BadRequest(format!("invalid message id: {s}")))
         })
         .collect()
 }

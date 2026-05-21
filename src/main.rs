@@ -13,6 +13,8 @@ mod services;
 
 use std::sync::{Arc, OnceLock};
 
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 use tokimo_bus_cli::TokimoAuthArgs;
 use tokimo_bus_client::{BusClient, ClientConfig};
@@ -77,6 +79,9 @@ enum Command {
         /// 回复的 Message-ID
         #[arg(long)]
         in_reply_to: Option<String>,
+        /// 附件文件路径（可多个）
+        #[arg(long)]
+        attachment: Vec<PathBuf>,
     },
     /// 同步账户邮件（文件夹 + 邮件）
     Sync {
@@ -140,7 +145,8 @@ async fn main() -> anyhow::Result<()> {
                     body,
                     html,
                     in_reply_to,
-                } => cli::run_send(auth, account_id, to, cc, subject, body, html, in_reply_to).await,
+                    attachment,
+                } => cli::run_send(auth, account_id, to, cc, subject, body, html, in_reply_to, attachment).await,
                 Command::Sync { account_id } => cli::run_sync(auth, account_id).await,
                 Command::Search {
                     account_id,

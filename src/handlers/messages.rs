@@ -158,7 +158,7 @@ pub async fn get_message(
     Path(message_id): Path<String>,
 ) -> Result<Json<ApiResponse<MailMessageFullOutput>>, AppError> {
     let uid = parse_user_id(&user_id)?;
-    let mid: Uuid = message_id
+    let mid: i32 = message_id
         .parse()
         .map_err(|_| AppError::BadRequest("invalid message id".into()))?;
     let msg = services::messages::get_message(&ctx.db, uid, mid).await?;
@@ -201,7 +201,7 @@ pub async fn refetch_body(
     Path(message_id): Path<String>,
 ) -> Result<Json<ApiResponse<MailMessageFullOutput>>, AppError> {
     let uid = parse_user_id(&user_id)?;
-    let mid: Uuid = message_id
+    let mid: i32 = message_id
         .parse()
         .map_err(|_| AppError::BadRequest("invalid message id".into()))?;
     let msg = services::messages::refetch_body(&ctx.db, uid, mid).await?;
