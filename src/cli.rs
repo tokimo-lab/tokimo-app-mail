@@ -22,18 +22,21 @@ pub enum AccountsCmd {
     List,
     /// 查看账户详情
     Get {
-        /// 账户 ID
-        id: Uuid,
+        /// 账户 ID 或邮箱地址
+        #[arg(long)]
+        id: String,
     },
     /// 测试账户连接 (IMAP + SMTP)
     Test {
-        /// 账户 ID
-        id: Uuid,
+        /// 账户 ID 或邮箱地址
+        #[arg(long)]
+        id: String,
     },
     /// 删除邮件账户
     Delete {
-        /// 账户 ID
-        id: Uuid,
+        /// 账户 ID 或邮箱地址
+        #[arg(long)]
+        id: String,
     },
     /// 添加邮件账户
     Add {
@@ -130,6 +133,7 @@ pub async fn run_accounts(auth: TokimoAuthArgs, cmd: AccountsCmd) -> anyhow::Res
             }
         }
         AccountsCmd::Get { id } => {
+            let id = resolve_account(&db, user_id, &id).await?;
             let account = repos::accounts::find_by_id_and_user(&db, id, user_id)
                 .await?
                 .ok_or_else(|| anyhow::anyhow!("account not found"))?;
@@ -146,10 +150,12 @@ pub async fn run_accounts(auth: TokimoAuthArgs, cmd: AccountsCmd) -> anyhow::Res
             }
         }
         AccountsCmd::Test { id } => {
+            let id = resolve_account(&db, user_id, &id).await?;
             services::accounts::test_connection(&db, user_id, id).await?;
             println!("Connection test passed.");
         }
         AccountsCmd::Delete { id } => {
+            let id = resolve_account(&db, user_id, &id).await?;
             services::accounts::delete_account(&db, user_id, id).await?;
             println!("Account {id} deleted.");
         }
@@ -203,9 +209,9 @@ pub async fn run_accounts(auth: TokimoAuthArgs, cmd: AccountsCmd) -> anyhow::Res
     Ok(())
 }
 
-pub async fn run_folders(auth: TokimoAuthArgs, account_id: Uuid, cmd: FoldersCmd) -> anyhow::Result<()> {
+pub async fn run_folders(auth: TokimoAuthArgs, account: String, cmd: FoldersCmd) -> anyhow::Result<()> {
     let (db, user_id) = init(auth).await?;
-    ensure_account(&db, user_id, account_id).await?;
+    let account_id = resolve_account(&db, user_id, &account).await?;
 
     match cmd {
         FoldersCmd::List => {
@@ -237,9 +243,9 @@ pub async fn run_folders(auth: TokimoAuthArgs, account_id: Uuid, cmd: FoldersCmd
     Ok(())
 }
 
-pub async fn run_messages(auth: TokimoAuthArgs, account_id: Uuid, cmd: MessagesCmd) -> anyhow::Result<()> {
+pub async fn run_messages(auth: TokimoAuthArgs, account: String, cmd: MessagesCmd) -> anyhow::Result<()> {
     let (db, user_id) = init(auth).await?;
-    ensure_account(&db, user_id, account_id).await?;
+    let account_id = resolve_account(&db, user_id, &account).await?;
 
     match cmd {
         MessagesCmd::List {
@@ -372,7 +378,7 @@ pub async fn run_messages(auth: TokimoAuthArgs, account_id: Uuid, cmd: MessagesC
 
 pub async fn run_send(
     auth: TokimoAuthArgs,
-    account_id: Uuid,
+    account: String,
     to: Vec<String>,
     cc: Vec<String>,
     subject: String,
@@ -382,6 +388,7 @@ pub async fn run_send(
     attachment_paths: Vec<PathBuf>,
 ) -> anyhow::Result<()> {
     let (db, user_id) = init(auth).await?;
+    let account_id = resolve_account(&db, user_id, &account).await?;
 
     let mut attachments = Vec::new();
     for path in &attachment_paths {
@@ -422,9 +429,9 @@ pub async fn run_send(
     Ok(())
 }
 
-pub async fn run_sync(auth: TokimoAuthArgs, account_id: Uuid) -> anyhow::Result<()> {
+pub async fn run_sync(auth: TokimoAuthArgs, account: String) -> anyhow::Result<()> {
     let (db, user_id) = init(auth).await?;
-    ensure_account(&db, user_id, account_id).await?;
+    let account_id = resolve_account(&db, user_id, &account).await?;
 
     let account = repos::accounts::find_by_id_and_user(&db, account_id, user_id)
         .await?
@@ -450,12 +457,12 @@ pub async fn run_sync(auth: TokimoAuthArgs, account_id: Uuid) -> anyhow::Result<
 
 pub async fn run_search(
     auth: TokimoAuthArgs,
-    account_id: Uuid,
+    account: String,
     query: String,
     _folder_id: Option<Uuid>,
 ) -> anyhow::Result<()> {
     let (db, user_id) = init(auth).await?;
-    ensure_account(&db, user_id, account_id).await?;
+    let account_id = resolve_account(&db, user_id, &account).await?;
 
     // Quick forward-sync INBOX so search reflects latest IMAP state.
     if let Ok(folders) = repos::folders::list_by_account(&db, account_id).await {
@@ -493,12 +500,19 @@ async fn init(auth: TokimoAuthArgs) -> anyhow::Result<(DatabaseConnection, Uuid)
     Ok((db, verified.user_id))
 }
 
-/// Verify that an account exists and belongs to the user, or bail with a clear error.
-async fn ensure_account(db: &DatabaseConnection, user_id: Uuid, account_id: Uuid) -> anyhow::Result<()> {
-    repos::accounts::find_by_id_and_user(db, account_id, user_id)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("Account {account_id} not found. Run `accounts list` to see available accounts."))?;
-    Ok(())
+/// Resolve an account identifier (UUID or email address) to a UUID.
+async fn resolve_account(db: &DatabaseConnection, user_id: Uuid, account: &str) -> anyhow::Result<Uuid> {
+    // Try UUID first.
+    if let Ok(id) = account.parse::<Uuid>() {
+        if repos::accounts::find_by_id_and_user(db, id, user_id).await?.is_some() {
+            return Ok(id);
+        }
+    }
+    // Fall back to email lookup.
+    if let Some(a) = repos::accounts::find_by_email_and_user(db, account, user_id).await? {
+        return Ok(a.id);
+    }
+    anyhow::bail!("Account '{account}' not found. Run `accounts list` to see available accounts.");
 }
 
 /// Resolve a message identifier (auto-increment ID or IMAP UID) to an i32 message ID.

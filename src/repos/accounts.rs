@@ -32,6 +32,19 @@ pub async fn find_by_id_and_user(
         .map_err(AppError::Database)
 }
 
+pub async fn find_by_email_and_user(
+    db: &DatabaseConnection,
+    email: &str,
+    user_id: Uuid,
+) -> Result<Option<mail_accounts::Model>, AppError> {
+    mail_accounts::Entity::find()
+        .filter(mail_accounts::Column::Email.eq(email))
+        .filter(mail_accounts::Column::UserId.eq(user_id))
+        .one(db)
+        .await
+        .map_err(AppError::Database)
+}
+
 pub async fn find_enabled_for_sync(db: &DatabaseConnection) -> Result<Vec<mail_accounts::Model>, AppError> {
     mail_accounts::Entity::find()
         .filter(mail_accounts::Column::IsEnabled.eq(true))
