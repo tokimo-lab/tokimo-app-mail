@@ -1,4 +1,5 @@
 //! DB 层 — 仅连接池初始化。schema migrations 由 host (`bus/app_migrator`) 统一执行。
+//! Schema 名从编译期内嵌的 `tokimo-app.toml` manifest 读取。
 
 pub mod entities;
 
@@ -6,7 +7,8 @@ use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 
 pub async fn init_pool() -> anyhow::Result<DatabaseConnection> {
     let base_url = std::env::var("DATABASE_URL").map_err(|_| anyhow::anyhow!("DATABASE_URL is required"))?;
-    let schema = std::env::var("TOKIMO_APP_SCHEMA").unwrap_or_else(|_| "mail".to_string());
+    let schema = tokimo_bus_cli::manifest::parse_app_schema(crate::MANIFEST)?
+        .ok_or_else(|| anyhow::anyhow!("manifest missing [database] schema"))?;
 
     let sep = if base_url.contains('?') { '&' } else { '?' };
     let encoded = urlencoding::encode(&schema);

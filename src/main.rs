@@ -1,5 +1,8 @@
 //! Tokimo Mail App — 多进程架构：CLI / Server 双模二进制。
 
+/// Compile-time embedded app manifest; shared with the library crate via lib.rs.
+const MANIFEST: &str = include_str!("../tokimo-app.toml");
+
 mod app_server;
 mod assets;
 mod cli;
