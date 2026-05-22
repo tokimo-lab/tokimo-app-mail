@@ -6,11 +6,10 @@ use anyhow::Context;
 use base64::Engine;
 use chrono::Utc;
 use sea_orm::DatabaseConnection;
-use tokimo_bus_auth::db::{connect_db, verify_token};
+use tokimo_bus_auth::db::verify_token;
 use tokimo_bus_cli::{Credentials, TokimoAuthArgs};
 use uuid::Uuid;
 
-use crate::db::init_schema;
 use crate::repos;
 use crate::services;
 
@@ -504,8 +503,7 @@ pub async fn run_search(
 
 async fn init(auth: TokimoAuthArgs) -> anyhow::Result<(DatabaseConnection, Uuid)> {
     let credentials = Credentials::resolve(&auth).context("resolve Tokimo credentials failed")?;
-    let db = connect_db().await.context("connect database failed")?;
-    init_schema(&db).await.context("init schema failed")?;
+    let db = crate::db::init_pool().await.context("connect database failed")?;
     let verified = verify_token(&db, &credentials.token)
         .await
         .context("verify Tokimo token failed")?;

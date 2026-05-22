@@ -174,8 +174,7 @@ async fn run_server() -> anyhow::Result<()> {
     info!(endpoint = ?cfg.endpoint, "mail: connecting to broker");
 
     let db = db::init_pool().await?;
-    db::init_schema(&db).await?;
-    info!("mail: db ready");
+    info!("mail: db connected (schema managed by host)");
 
     let client_slot: Arc<OnceLock<Arc<BusClient>>> = Arc::new(OnceLock::new());
     let context = Arc::new(ctx::AppCtx {

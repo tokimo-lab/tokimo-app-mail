@@ -22,3 +22,8 @@ height       = 800
 [cli]
 name = "tokimo-app-mail"
 description = "Read and manage user emails with full operational support (read, send, etc.)."
+
+[database]
+schema = "mail"
+migrations_dir = "migrations"
+driver = "postgres"

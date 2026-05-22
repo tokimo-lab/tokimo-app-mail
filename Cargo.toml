@@ -7,10 +7,10 @@ license     = "MIT OR Apache-2.0"
 description = "Tokimo mail app — standalone multi-process IMAP/SMTP client."
 
 [dependencies]
-tokimo-bus-client   = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "b68aa99c846fbe9e201df5b6a7ea91d84b642340" }
-tokimo-bus-protocol = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "b68aa99c846fbe9e201df5b6a7ea91d84b642340", features = ["axum"] }
-tokimo-bus-auth     = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "b68aa99c846fbe9e201df5b6a7ea91d84b642340", features = ["axum", "cli-db"] }
-tokimo-bus-cli      = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "b68aa99c846fbe9e201df5b6a7ea91d84b642340" }
+tokimo-bus-client   = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "5a605f4c7d6953349f719f3c9963fd34d72b834d" }
+tokimo-bus-protocol = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "5a605f4c7d6953349f719f3c9963fd34d72b834d", features = ["axum"] }
+tokimo-bus-auth     = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "5a605f4c7d6953349f719f3c9963fd34d72b834d", features = ["axum", "cli-db"] }
+tokimo-bus-cli      = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "5a605f4c7d6953349f719f3c9963fd34d72b834d" }
 tokimo-package-mail = { git = "https://github.com/tokimo-lab/tokimo-package-mail.git", rev = "b06841214a42f55817fef30672b83449f21becc7" }
 
 clap              = { version = "4", features = ["derive", "env"] }
@@ -27,6 +27,7 @@ mime_guess        = "2"
 anyhow            = "1"
 axum              = { version = "0.8", features = ["json", "multipart"] }
 base64            = "0.22"
+urlencoding       = "2"
 ts-rs             = { version = "12", features = ["serde-json-impl"] }
 
 [profile.release]
