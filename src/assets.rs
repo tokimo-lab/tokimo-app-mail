@@ -1,4 +1,4 @@
-//! 静态资源服务 — rust_embed 嵌入 ui/dist/，开发时可通过环境变量覆盖。
+//! 静态资源服务 — rust_embed 嵌入 ui/dist/，dev 模式通过 cwd 相对路径覆盖（host 设 cwd = install_dir）。
 
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
@@ -9,6 +9,7 @@ use rust_embed::Embed;
 #[prefix = ""]
 struct EmbeddedUi;
 
+#[allow(clippy::collapsible_if)]
 pub async fn serve(path: Option<axum::extract::Path<String>>) -> impl IntoResponse {
     let path = path.map(|p| p.0).unwrap_or_default();
     let path = if path.is_empty() || path.ends_with('/') {
@@ -17,16 +18,21 @@ pub async fn serve(path: Option<axum::extract::Path<String>>) -> impl IntoRespon
         path
     };
 
-    // 开发模式：从文件系统读取
-    if let Ok(dir) = std::env::var("TOKIMO_APP_ASSETS_DIR") {
-        let full = format!("{dir}/{path}");
-        if let Ok(data) = std::fs::read(&full) {
-            let mime = mime_from_path(&path);
-            return Response::builder()
-                .header(header::CONTENT_TYPE, mime)
-                .header(header::CACHE_CONTROL, "no-store")
-                .body(axum::body::Body::from(data))
-                .unwrap();
+    // dev 模式：host 设 cwd = install_dir，检测 manifest.ui_dist 目录是否存在
+    let ui_dist_opt = tokimo_bus_cli::manifest::parse_app_ui_dist(crate::MANIFEST)
+        .ok()
+        .flatten();
+    if let Some(ui_dist) = ui_dist_opt.as_deref() {
+        let candidate = std::path::Path::new(ui_dist).join(&path);
+        if candidate.exists() {
+            if let Ok(data) = std::fs::read(&candidate) {
+                let mime = mime_from_path(&path);
+                return Response::builder()
+                    .header(header::CONTENT_TYPE, mime)
+                    .header(header::CACHE_CONTROL, "no-store")
+                    .body(axum::body::Body::from(data))
+                    .unwrap();
+            }
         }
     }
 
