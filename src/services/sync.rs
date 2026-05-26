@@ -1,5 +1,9 @@
+use std::sync::Arc;
+
 use chrono::Utc;
 use sea_orm::*;
+use tokimo_bus_client::BusClient;
+use tokimo_bus_protocol::CallerCtx;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -8,22 +12,99 @@ use crate::db::entities::{mail_accounts, mail_folders, mail_messages};
 use crate::error::AppError;
 use crate::repos;
 
-/// Event broadcaster trait — replaces the main server's AppEventSender.
+/// Event broadcaster trait — fires entity events via the OS bus.
 pub trait EventBroadcaster: Send + Sync + 'static {
-    fn broadcast_new_messages(&self, account_id: &str, folder_id: &str, count: usize);
-    fn broadcast_flags_synced(&self, account_id: &str, folder_id: &str, read_uids: Vec<i32>, unread_uids: Vec<i32>);
-    fn broadcast_folder_counts(&self, account_id: &str, folders: Vec<(String, i64)>);
+    fn broadcast_new_messages(&self, user_id: Uuid, account_id: &str, folder_id: &str, count: usize);
+    fn broadcast_flags_synced(&self, user_id: Uuid, account_id: &str, folder_id: &str, read_uids: Vec<i32>, unread_uids: Vec<i32>);
+    fn broadcast_folder_counts(&self, user_id: Uuid, account_id: &str, folders: Vec<(String, i64)>);
     fn clone_box(&self) -> Box<dyn EventBroadcaster>;
 }
 
 /// No-op broadcaster for CLI mode.
 pub struct NoopBroadcaster;
 impl EventBroadcaster for NoopBroadcaster {
-    fn broadcast_new_messages(&self, _: &str, _: &str, _: usize) {}
-    fn broadcast_flags_synced(&self, _: &str, _: &str, _: Vec<i32>, _: Vec<i32>) {}
-    fn broadcast_folder_counts(&self, _: &str, _: Vec<(String, i64)>) {}
+    fn broadcast_new_messages(&self, _: Uuid, _: &str, _: &str, _: usize) {}
+    fn broadcast_flags_synced(&self, _: Uuid, _: &str, _: &str, _: Vec<i32>, _: Vec<i32>) {}
+    fn broadcast_folder_counts(&self, _: Uuid, _: &str, _: Vec<(String, i64)>) {}
     fn clone_box(&self) -> Box<dyn EventBroadcaster> {
         Box::new(NoopBroadcaster)
+    }
+}
+
+/// Live broadcaster — forwards events to the OS via `app_events.emit`.
+pub struct BusBroadcaster {
+    client: Arc<BusClient>,
+}
+
+impl BusBroadcaster {
+    pub fn new(client: Arc<BusClient>) -> Self {
+        Self { client }
+    }
+
+    fn emit(&self, user_id: Uuid, kind: &'static str, scope: String, payload: serde_json::Value) {
+        let client = Arc::clone(&self.client);
+        let user_id_str = user_id.to_string();
+        tokio::spawn(async move {
+            let body = serde_json::json!({
+                "kind": kind,
+                "scope": scope,
+                "payload": payload,
+            })
+            .to_string()
+            .into_bytes();
+            let caller = CallerCtx {
+                caller_app_id: Some("mail".into()),
+                user_id: Some(user_id_str),
+                ..Default::default()
+            };
+            if let Err(e) = client.invoke("app_events", "emit", body, caller).await {
+                warn!("mail: app_events.emit({kind}) failed: {e}");
+            }
+        });
+    }
+}
+
+impl EventBroadcaster for BusBroadcaster {
+    fn broadcast_new_messages(&self, user_id: Uuid, account_id: &str, folder_id: &str, count: usize) {
+        let payload = serde_json::json!({
+            "accountId": account_id,
+            "folderId": folder_id,
+            "count": count,
+        });
+        self.emit(user_id, "new_messages", format!("account:{account_id}"), payload);
+    }
+
+    fn broadcast_flags_synced(
+        &self,
+        user_id: Uuid,
+        account_id: &str,
+        folder_id: &str,
+        read_uids: Vec<i32>,
+        unread_uids: Vec<i32>,
+    ) {
+        let payload = serde_json::json!({
+            "accountId": account_id,
+            "folderId": folder_id,
+            "readUids": read_uids,
+            "unreadUids": unread_uids,
+        });
+        self.emit(user_id, "flags_synced", format!("account:{account_id}"), payload);
+    }
+
+    fn broadcast_folder_counts(&self, user_id: Uuid, account_id: &str, folders: Vec<(String, i64)>) {
+        let folders_json: Vec<serde_json::Value> = folders
+            .iter()
+            .map(|(id, count)| serde_json::json!({"folderId": id, "unreadCount": count}))
+            .collect();
+        let payload = serde_json::json!({
+            "accountId": account_id,
+            "folders": folders_json,
+        });
+        self.emit(user_id, "folder_counts", format!("account:{account_id}"), payload);
+    }
+
+    fn clone_box(&self) -> Box<dyn EventBroadcaster> {
+        Box::new(BusBroadcaster { client: Arc::clone(&self.client) })
     }
 }
 
@@ -69,7 +150,7 @@ pub async fn sync_account(
 
     // 2. Sync messages for each folder.
     for folder in &db_folders {
-        if let Err(e) = sync_folder_messages(db, &cfg, account_id, folder, event_tx).await {
+        if let Err(e) = sync_folder_messages(db, &cfg, account_id, user_id, folder, event_tx).await {
             warn!("Failed to sync folder '{}' for {}: {e}", folder.name, account.email);
         }
     }
@@ -198,6 +279,7 @@ async fn sync_folder_messages(
     db: &DatabaseConnection,
     cfg: &tokimo_package_mail::MailAccountConfig,
     account_id: Uuid,
+    user_id: Uuid,
     folder: &mail_folders::Model,
     event_tx: Option<&dyn EventBroadcaster>,
 ) -> Result<(), AppError> {
@@ -333,7 +415,7 @@ async fn sync_folder_messages(
             if (!read_uids.is_empty() || !unread_uids.is_empty())
                 && let Some(tx) = event_tx
             {
-                tx.broadcast_flags_synced(&account_id.to_string(), &folder.id.to_string(), read_uids, unread_uids);
+                tx.broadcast_flags_synced(user_id, &account_id.to_string(), &folder.id.to_string(), read_uids, unread_uids);
             }
         }
         Err(e) => warn!("Folder '{}': flag sync failed: {e}", folder.name),

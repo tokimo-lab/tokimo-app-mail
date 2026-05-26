@@ -1,14 +1,17 @@
 //! 本地 scheduler — tokio interval 循环，管理定期同步和 body fetch。
 
-use sea_orm::DatabaseConnection;
+use std::sync::Arc;
 use std::time::Duration;
+
+use sea_orm::DatabaseConnection;
+use tokimo_bus_client::BusClient;
 use tracing::{info, warn};
 
 use crate::services::body_fetch;
 use crate::services::idle;
-use crate::services::sync::{self, NoopBroadcaster};
+use crate::services::sync::{self, BusBroadcaster};
 
-pub fn start(db: DatabaseConnection) {
+pub fn start(db: DatabaseConnection, bus_client: Arc<BusClient>) {
     info!("mail scheduler: starting");
 
     let db2 = db.clone();
@@ -21,7 +24,7 @@ pub fn start(db: DatabaseConnection) {
         body_fetch_loop(db3).await;
     });
 
-    idle::start(db, NoopBroadcaster);
+    idle::start(db, BusBroadcaster::new(bus_client));
 }
 
 async fn sync_loop(db: DatabaseConnection) {

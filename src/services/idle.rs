@@ -42,11 +42,12 @@ async fn run_manager(db: DatabaseConnection, event_tx: Box<dyn EventBroadcaster>
             }
             let cfg = account_to_config(account);
             let account_id = account.id;
+            let user_id = account.user_id;
             let db2 = db.clone();
             let tx2 = event_tx.clone_box();
             let handle = tokio::spawn(async move {
                 info!("IDLE: starting loop for account {account_id}");
-                run_account_idle(db2, tx2, cfg, account_id).await;
+                run_account_idle(db2, tx2, cfg, account_id, user_id).await;
             });
             account_tasks.insert(account_id, handle);
         }
@@ -60,6 +61,7 @@ async fn run_account_idle(
     event_tx: Box<dyn EventBroadcaster>,
     cfg: tokimo_package_mail::MailAccountConfig,
     account_id: Uuid,
+    user_id: Uuid,
 ) {
     let mut backoff = Duration::from_secs(5);
 
@@ -78,10 +80,10 @@ async fn run_account_idle(
                 let folder = repos::folders::find_inbox(&db, account_id).await.unwrap_or(None);
 
                 if let Some(folder) = folder {
-                    match forward_sync_inbox(&db, &cfg, account_id, &folder, event_tx.as_ref()).await {
+                    match forward_sync_inbox(&db, &cfg, account_id, user_id, &folder, event_tx.as_ref()).await {
                         Ok(0) if new_data => {
                             tokio::time::sleep(Duration::from_secs(3)).await;
-                            if let Err(e) = forward_sync_inbox(&db, &cfg, account_id, &folder, event_tx.as_ref()).await
+                            if let Err(e) = forward_sync_inbox(&db, &cfg, account_id, user_id, &folder, event_tx.as_ref()).await
                             {
                                 warn!("IDLE: inbox sync retry failed for {account_id}: {e}");
                             }
@@ -112,6 +114,7 @@ async fn forward_sync_inbox(
     db: &DatabaseConnection,
     cfg: &tokimo_package_mail::MailAccountConfig,
     account_id: Uuid,
+    user_id: Uuid,
     folder: &mail_folders::Model,
     event_tx: &dyn EventBroadcaster,
 ) -> Result<usize, AppError> {
@@ -138,11 +141,11 @@ async fn forward_sync_inbox(
                 count, folder.name
             );
 
-            event_tx.broadcast_new_messages(&account_id.to_string(), &folder.id.to_string(), count);
+            event_tx.broadcast_new_messages(user_id, &account_id.to_string(), &folder.id.to_string(), count);
 
             let unread = repos::messages::count_unread(db, folder.id).await?;
             repos::folders::update_unread_count(db, folder.id, unread as i32).await?;
-            event_tx.broadcast_folder_counts(&account_id.to_string(), vec![(folder.id.to_string(), unread)]);
+            event_tx.broadcast_folder_counts(user_id, &account_id.to_string(), vec![(folder.id.to_string(), unread)]);
             count
         }
         Ok(_) => {

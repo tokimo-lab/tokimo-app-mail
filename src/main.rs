@@ -202,7 +202,7 @@ async fn run_server() -> anyhow::Result<()> {
     info!("mail: registered with broker");
 
     // Start background scheduler (sync, body fetch, IDLE).
-    scheduler::start(db);
+    scheduler::start(db, Arc::clone(&client));
 
     let shutdown = {
         let client = Arc::clone(&client);
