@@ -29,7 +29,6 @@ import type {
   MailFolderOutput,
 } from "../generated/rust-api/mail";
 import { useTranslation } from "../i18n";
-import { useWs } from "../lib/ws";
 
 const SPECIAL_FOLDER_ICONS: Record<string, typeof Inbox> = {
   inbox: Inbox,
@@ -137,49 +136,52 @@ export function MailSidebar({
   const folders = (folderQuery.data ?? []) as MailFolderOutput[];
 
   const queryClient = useQueryClient();
-  const ws = useWs(shell);
   useEffect(() => {
-    return ws.subscribe("mail:flags_synced", (msg) => {
-      const data = msg.data as {
-        accountId: string;
-        folderId: string;
-        readUids: number[];
-        unreadUids: number[];
-      };
-      const delta = data.unreadUids.length - data.readUids.length;
-      if (delta === 0) return;
-      const key = mailApi.listFolders.queryKey({
-        accountId: data.accountId,
-      });
-      queryClient.setQueryData<MailFolderOutput[]>(key, (old) => {
-        if (!old) return old;
-        return old.map((f) => {
-          if (f.id !== data.folderId) return f;
-          return { ...f, unreadCount: Math.max(0, f.unreadCount + delta) };
-        });
-      });
+    if (!shell) return;
+    return shell.appEntityEvents.subscribe({
+      enabled: true,
+      onEvent: (event) => {
+        if (event.kind === "flags_synced") {
+          const data = event.payload as {
+            accountId: string;
+            folderId: string;
+            readUids: number[];
+            unreadUids: number[];
+          };
+          const delta = data.unreadUids.length - data.readUids.length;
+          if (delta === 0) return;
+          const key = mailApi.listFolders.queryKey({
+            accountId: data.accountId,
+          });
+          queryClient.setQueryData<MailFolderOutput[]>(key, (old) => {
+            if (!old) return old;
+            return old.map((f) => {
+              if (f.id !== data.folderId) return f;
+              return { ...f, unreadCount: Math.max(0, f.unreadCount + delta) };
+            });
+          });
+        } else if (event.kind === "folder_counts") {
+          const data = event.payload as {
+            accountId: string;
+            folders: { folderId: string; unreadCount: number }[];
+          };
+          const key = mailApi.listFolders.queryKey({
+            accountId: data.accountId,
+          });
+          queryClient.setQueryData<MailFolderOutput[]>(key, (old) => {
+            if (!old) return old;
+            const countMap = new Map(
+              data.folders.map((f) => [f.folderId, f.unreadCount]),
+            );
+            return old.map((f) => {
+              const count = countMap.get(f.id);
+              return count !== undefined ? { ...f, unreadCount: count } : f;
+            });
+          });
+        }
+      },
     });
-  }, [ws, queryClient]);
-
-  useEffect(() => {
-    return ws.subscribe("mail:folder_counts", (msg) => {
-      const data = msg.data as {
-        accountId: string;
-        folders: { folderId: string; unreadCount: number }[];
-      };
-      const key = mailApi.listFolders.queryKey({ accountId: data.accountId });
-      queryClient.setQueryData<MailFolderOutput[]>(key, (old) => {
-        if (!old) return old;
-        const countMap = new Map(
-          data.folders.map((f) => [f.folderId, f.unreadCount]),
-        );
-        return old.map((f) => {
-          const count = countMap.get(f.id);
-          return count !== undefined ? { ...f, unreadCount: count } : f;
-        });
-      });
-    });
-  }, [ws, queryClient]);
+  }, [shell, queryClient]);
 
   const autoSelectedRef = useRef<string | null>(null);
   useEffect(() => {

@@ -17,7 +17,6 @@ import type {
   MailMessageSummaryOutput,
 } from "../generated/rust-api/mail";
 import { useTranslation } from "../i18n";
-import { useWs } from "../lib/ws";
 
 const PAGE_SIZE = 50;
 const LOAD_THRESHOLD = 120; // px from bottom to trigger next page
@@ -147,78 +146,79 @@ export function MailList({
     [accountId, folderId, page, queryClient],
   );
 
-  // Subscribe to mail:flags_synced to apply IMAP flag changes in real-time.
-  const ws = useWs(shell);
+  // Subscribe to flags_synced and new_messages entity events via the OS bus.
   useEffect(() => {
-    return ws.subscribe("mail:flags_synced", (msg) => {
-      const data = msg.data as {
-        accountId: string;
-        folderId: string;
-        readUids: number[];
-        unreadUids: number[];
-      };
-      if (data.folderId !== folderId) return;
-      const readSet = new Set(data.readUids);
-      const unreadSet = new Set(data.unreadUids);
-      if (readSet.size === 0 && unreadSet.size === 0) return;
+    if (!shell) return;
+    return shell.appEntityEvents.subscribe({
+      enabled: true,
+      onEvent: (event) => {
+        if (event.kind === "flags_synced") {
+          const data = event.payload as {
+            accountId: string;
+            folderId: string;
+            readUids: number[];
+            unreadUids: number[];
+          };
+          if (data.folderId !== folderId) return;
+          const readSet = new Set(data.readUids);
+          const unreadSet = new Set(data.unreadUids);
+          if (readSet.size === 0 && unreadSet.size === 0) return;
 
-      // Update local state.
-      setAllMessages((prev) =>
-        prev.map((m) => {
-          if (readSet.has(m.uid)) return { ...m, isRead: true };
-          if (unreadSet.has(m.uid)) return { ...m, isRead: false };
-          return m;
-        }),
-      );
-
-      // Update React Query cache for all pages.
-      for (let p = 1; p <= page; p++) {
-        const key = mailApi.listMessages.queryKey({
-          accountId,
-          folderId,
-          page: p,
-          pageSize: PAGE_SIZE,
-        });
-        queryClient.setQueryData<MailMessageListOutput>(key, (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            messages: old.messages.map((m) => {
+          // Update local state.
+          setAllMessages((prev) =>
+            prev.map((m) => {
               if (readSet.has(m.uid)) return { ...m, isRead: true };
               if (unreadSet.has(m.uid)) return { ...m, isRead: false };
               return m;
             }),
-          };
-        });
-      }
-    });
-  }, [accountId, folderId, page, queryClient, ws]);
+          );
 
-  // Subscribe to mail:new_messages (IMAP IDLE push) to show new mail instantly.
-  useEffect(() => {
-    return ws.subscribe("mail:new_messages", (msg) => {
-      const data = msg.data as {
-        accountId: string;
-        folderId: string;
-        count: number;
-      };
-      if (data.accountId !== accountId || data.folderId !== folderId) return;
-      // Invalidate page 1 so the list refreshes with the new messages at top.
-      queryClient.invalidateQueries({
-        queryKey: mailApi.listMessages.queryKey({
-          accountId,
-          folderId,
-          page: 1,
-          pageSize: PAGE_SIZE,
-        }),
-      });
-      // Reset to page 1 to show the newest messages.
-      // Keep existing messages visible until fresh data arrives.
-      setPage(1);
-      setHasMore(true);
-      hasMoreRef.current = true;
+          // Update React Query cache for all pages.
+          for (let p = 1; p <= page; p++) {
+            const key = mailApi.listMessages.queryKey({
+              accountId,
+              folderId,
+              page: p,
+              pageSize: PAGE_SIZE,
+            });
+            queryClient.setQueryData<MailMessageListOutput>(key, (old) => {
+              if (!old) return old;
+              return {
+                ...old,
+                messages: old.messages.map((m) => {
+                  if (readSet.has(m.uid)) return { ...m, isRead: true };
+                  if (unreadSet.has(m.uid)) return { ...m, isRead: false };
+                  return m;
+                }),
+              };
+            });
+          }
+        } else if (event.kind === "new_messages") {
+          const data = event.payload as {
+            accountId: string;
+            folderId: string;
+            count: number;
+          };
+          if (data.accountId !== accountId || data.folderId !== folderId)
+            return;
+          // Invalidate page 1 so the list refreshes with the new messages at top.
+          queryClient.invalidateQueries({
+            queryKey: mailApi.listMessages.queryKey({
+              accountId,
+              folderId,
+              page: 1,
+              pageSize: PAGE_SIZE,
+            }),
+          });
+          // Reset to page 1 to show the newest messages.
+          // Keep existing messages visible until fresh data arrives.
+          setPage(1);
+          setHasMore(true);
+          hasMoreRef.current = true;
+        }
+      },
     });
-  }, [accountId, folderId, queryClient, ws]);
+  }, [shell, accountId, folderId, page, queryClient]);
 
   const handleSelectMessage = useCallback(
     (id: string) => {
