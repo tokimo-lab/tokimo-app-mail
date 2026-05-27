@@ -1,4 +1,5 @@
 import type { ShellApi } from "@tokimo/sdk";
+import type { MailAccountOutput } from "./generated/rust-api/mail";
 
 interface AccountSetupBridge {
   kind: "account-setup";
@@ -14,7 +15,18 @@ interface ComposerBridge {
   onSent?: () => void;
 }
 
-export type ModalBridge = AccountSetupBridge | ComposerBridge;
+interface AccountEditBridge {
+  kind: "account-edit";
+  shell: ShellApi;
+  locale: string;
+  account: MailAccountOutput;
+  onSaved: () => void;
+}
+
+export type ModalBridge =
+  | AccountSetupBridge
+  | ComposerBridge
+  | AccountEditBridge;
 
 const registry = new Map<string, ModalBridge>();
 let counter = 0;

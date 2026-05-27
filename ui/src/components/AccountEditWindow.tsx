@@ -1,22 +1,18 @@
-/**
- * AccountEditDialog — modal for editing an existing mail account.
- * Shows display name, server settings, and optional password change.
- */
-
-import { useQueryClient } from "@tanstack/react-query";
 import {
+  Button,
   Checkbox,
   Form,
   Input,
-  Modal,
   Password,
   ScrollArea,
   Select,
 } from "@tokimo/ui";
+import { useState } from "react";
 import { mailApi } from "../generated/rust-api";
-import type { MailAccountOutput } from "../generated/rust-api/mail";
 import { useTranslation } from "../i18n";
-import { useMessage } from "../lib/shell-context";
+import type { AppModalWindowHandle } from "../lib/modal-window";
+import { MailProviders } from "../lib/providers";
+import { clearBridge, getBridge } from "../modal-bridge";
 
 const SECURITY_OPTIONS = [
   { value: "tls", label: "SSL/TLS" },
@@ -24,35 +20,63 @@ const SECURITY_OPTIONS = [
   { value: "none", label: "None" },
 ];
 
-interface AccountEditDialogProps {
-  account: MailAccountOutput;
-  open: boolean;
-  onClose: () => void;
+function getBridgeId(win: AppModalWindowHandle): string | null {
+  const value = win.metadata.bridgeId;
+  return typeof value === "string" ? value : null;
 }
 
-export function AccountEditDialog({
-  account,
-  open,
-  onClose,
-}: AccountEditDialogProps) {
+function AccountEditForm({
+  win,
+  bridgeId,
+}: {
+  win: AppModalWindowHandle;
+  bridgeId: string;
+}) {
   const { t } = useTranslation();
-  const msg = useMessage();
-  const qc = useQueryClient();
+  const [bridge] = useState(() => getBridge(bridgeId));
+
   const [form] = Form.useForm();
   const changePassword = Form.useWatch<boolean>("changePassword", form);
 
   const updateMutation = mailApi.updateAccount.useMutation({
     onSuccess: () => {
-      msg.success(t("mail.account.saveSuccess"));
-      mailApi.listAccounts.invalidate(qc);
-      onClose();
+      if (bridge?.kind === "account-edit") bridge.onSaved();
+      clearBridge(bridgeId);
+      win.close();
     },
     onError: (err) => {
-      msg.error(t("mail.account.saveFailed", { error: err.message }));
+      if (bridge?.kind === "account-edit") {
+        bridge.shell.toast.error(
+          t("mail.account.saveFailed", { error: err.message }),
+        );
+      }
     },
   });
 
-  const handleOk = async () => {
+  if (!bridge || bridge.kind !== "account-edit") {
+    return (
+      <div className="flex h-full items-center justify-center p-8 text-sm text-text-muted">
+        {t("mail.account.editTitle")}
+      </div>
+    );
+  }
+
+  const { account } = bridge;
+
+  const initialValues = {
+    displayName: account.displayName,
+    senderName: account.senderName ?? "",
+    imapHost: account.imapHost,
+    imapPort: String(account.imapPort),
+    imapSecurity: account.imapSecurity,
+    smtpHost: account.smtpHost,
+    smtpPort: String(account.smtpPort),
+    smtpSecurity: account.smtpSecurity,
+    changePassword: false,
+    newPassword: "",
+  };
+
+  const handleSave = async () => {
     try {
       const values = await form.validateFields();
       updateMutation.mutate({
@@ -79,38 +103,20 @@ export function AccountEditDialog({
     }
   };
 
-  const initialValues = {
-    displayName: account.displayName,
-    senderName: account.senderName ?? "",
-    imapHost: account.imapHost,
-    imapPort: String(account.imapPort),
-    imapSecurity: account.imapSecurity,
-    smtpHost: account.smtpHost,
-    smtpPort: String(account.smtpPort),
-    smtpSecurity: account.smtpSecurity,
-    changePassword: false,
-    newPassword: "",
+  const handleCancel = () => {
+    clearBridge(bridgeId);
+    win.close();
   };
 
   return (
-    <Modal
-      open={open}
-      title={t("mail.account.editTitle")}
-      okText={t("mail.account.save")}
-      cancelText={t("mail.setup.cancel")}
-      onOk={handleOk}
-      onCancel={onClose}
-      confirmLoading={updateMutation.isPending}
-      width={520}
-    >
-      <ScrollArea direction="vertical" style={{ maxHeight: 460 }}>
+    <div className="flex h-full flex-col">
+      <ScrollArea direction="vertical" className="min-h-0 flex-1">
         <Form
           form={form}
           layout="vertical"
           initialValues={initialValues}
-          className="py-2 pr-1"
+          className="p-4"
         >
-          {/* Basic info */}
           <Form.Item label={t("mail.setup.displayName")} name="displayName">
             <Input placeholder={t("mail.setup.displayNamePlaceholder")} />
           </Form.Item>
@@ -178,7 +184,10 @@ export function AccountEditDialog({
                 name="newPassword"
                 label={t("mail.account.newPassword")}
                 rules={[
-                  { required: true, message: t("mail.setup.passwordRequired") },
+                  {
+                    required: true,
+                    message: t("mail.setup.passwordRequired"),
+                  },
                 ]}
               >
                 <Password
@@ -189,6 +198,36 @@ export function AccountEditDialog({
           </div>
         </Form>
       </ScrollArea>
-    </Modal>
+
+      <div className="flex justify-end gap-2 border-t border-border-base p-3">
+        <Button variant="text" onClick={handleCancel}>
+          {t("mail.setup.cancel")}
+        </Button>
+        <Button
+          variant="primary"
+          loading={updateMutation.isPending}
+          onClick={handleSave}
+        >
+          {t("mail.account.save")}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export default function AccountEditWindow({
+  win,
+}: {
+  win: AppModalWindowHandle;
+}) {
+  const bridgeId = getBridgeId(win);
+  const [bridge] = useState(() => (bridgeId ? getBridge(bridgeId) : undefined));
+
+  if (!bridgeId || bridge?.kind !== "account-edit") return null;
+
+  return (
+    <MailProviders locale={bridge.locale} toast={bridge.shell.toast}>
+      <AccountEditForm win={win} bridgeId={bridgeId} />
+    </MailProviders>
   );
 }

@@ -11,7 +11,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { AccountEditDialog } from "./components/AccountEditDialog";
 import { MailList } from "./components/MailList";
 import { MailSidebar } from "./components/MailSidebar";
 import { MailViewer } from "./components/MailViewer";
@@ -77,8 +76,6 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
   } = useMailAccounts();
   const msg = ctx.shell.toast;
   const qc = useQueryClient();
-  const [editingAccount, setEditingAccount] =
-    useState<MailAccountOutput | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
     null,
   );
@@ -218,6 +215,30 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
     });
   }, [ctx.locale, ctx.shell, refetchAccounts, t]);
 
+  const handleEditAccount = useCallback(
+    (account: MailAccountOutput) => {
+      const bridgeId = registerBridge({
+        kind: "account-edit",
+        shell: ctx.shell,
+        locale: ctx.locale,
+        account,
+        onSaved: () => {
+          mailApi.listAccounts.invalidate(qc);
+          void refetchAccounts();
+          msg.success(t("mail.account.saveSuccess"));
+        },
+      });
+      openShellModalWindow(ctx.shell, {
+        component: () => import("./components/AccountEditWindow"),
+        title: t("mail.account.editTitle"),
+        width: 560,
+        height: 640,
+        metadata: { bridgeId },
+      });
+    },
+    [ctx.locale, ctx.shell, msg, qc, refetchAccounts, t],
+  );
+
   const deleteAccountMutation = mailApi.deleteAccount.useMutation({
     onSuccess: () => {
       msg.success(t("mail.account.deleteSuccess"));
@@ -296,77 +317,65 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
   }
 
   return (
-    <>
-      <div ref={containerRef} className="flex h-full overflow-hidden">
-        <MailSidebar
-          accounts={accounts}
-          selectedAccountId={activeAccountId}
-          selectedFolderId={selectedFolderId}
-          collapsed={sidebarCollapsed}
-          onSelectAccount={handleSelectAccount}
-          onSelectFolder={handleSelectFolder}
-          onAddAccount={handleAddAccount}
-          onCompose={() => openComposer()}
-          onToggleCollapse={() =>
-            setManuallyCollapsed((v) => !(v ?? sidebarCollapsed))
-          }
-          onEditAccount={setEditingAccount}
-          onDeleteAccount={handleDeleteAccount}
+    <div ref={containerRef} className="flex h-full overflow-hidden">
+      <MailSidebar
+        accounts={accounts}
+        selectedAccountId={activeAccountId}
+        selectedFolderId={selectedFolderId}
+        collapsed={sidebarCollapsed}
+        onSelectAccount={handleSelectAccount}
+        onSelectFolder={handleSelectFolder}
+        onAddAccount={handleAddAccount}
+        onCompose={() => openComposer()}
+        onToggleCollapse={() =>
+          setManuallyCollapsed((v) => !(v ?? sidebarCollapsed))
+        }
+        onEditAccount={handleEditAccount}
+        onDeleteAccount={handleDeleteAccount}
+        shell={ctx.shell}
+      />
+
+      {activeAccountId && selectedFolderId ? (
+        <MailList
+          accountId={activeAccountId}
+          folderId={selectedFolderId}
+          selectedMessageId={selectedMessageId}
+          onSelectMessage={setSelectedMessageId}
           shell={ctx.shell}
         />
-
-        {activeAccountId && selectedFolderId ? (
-          <MailList
-            accountId={activeAccountId}
-            folderId={selectedFolderId}
-            selectedMessageId={selectedMessageId}
-            onSelectMessage={setSelectedMessageId}
-            shell={ctx.shell}
+      ) : (
+        <div className="flex w-72 shrink-0 items-center justify-center border-r border-border-base">
+          <Empty
+            image={<Mail className="size-10 stroke-1" />}
+            description={t("mail.app.selectFolder")}
           />
-        ) : (
-          <div className="flex w-72 shrink-0 items-center justify-center border-r border-border-base">
-            <Empty
-              image={<Mail className="size-10 stroke-1" />}
-              description={t("mail.app.selectFolder")}
-            />
-          </div>
-        )}
-
-        {selectedMessageId ? (
-          <MailViewer
-            messageId={selectedMessageId}
-            onReply={(messageId) =>
-              openComposer({ mode: "reply", replyToMessageId: messageId })
-            }
-            onForward={(messageId) =>
-              openComposer({ mode: "forward", replyToMessageId: messageId })
-            }
-            onDelete={(id) =>
-              deleteMessageMutation.mutate({ message_ids: [id] })
-            }
-            onClose={() => setSelectedMessageId(null)}
-          />
-        ) : (
-          <div className="flex min-w-0 flex-1 items-center justify-center">
-            <Empty
-              image={<Mail className="size-10 stroke-1" />}
-              description={
-                selectedFolderId
-                  ? t("mail.app.selectMessage")
-                  : t("mail.app.selectFolderFirst")
-              }
-            />
-          </div>
-        )}
-      </div>
-
-      {editingAccount && (
-        <AccountEditDialog
-          account={editingAccount}
-          open={true}
-          onClose={() => setEditingAccount(null)}
-        />
+        </div>
       )}
-    </>
+
+      {selectedMessageId ? (
+        <MailViewer
+          messageId={selectedMessageId}
+          onReply={(messageId) =>
+            openComposer({ mode: "reply", replyToMessageId: messageId })
+          }
+          onForward={(messageId) =>
+            openComposer({ mode: "forward", replyToMessageId: messageId })
+          }
+          onDelete={(id) => deleteMessageMutation.mutate({ message_ids: [id] })}
+          onClose={() => setSelectedMessageId(null)}
+        />
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center justify-center">
+          <Empty
+            image={<Mail className="size-10 stroke-1" />}
+            description={
+              selectedFolderId
+                ? t("mail.app.selectMessage")
+                : t("mail.app.selectFolderFirst")
+            }
+          />
+        </div>
+      )}
+    </div>
   );
 }
