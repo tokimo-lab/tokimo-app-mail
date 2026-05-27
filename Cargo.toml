@@ -11,7 +11,7 @@ tokimo-bus-client   = { git = "https://github.com/tokimo-lab/tokimo-bus.git", re
 tokimo-bus-protocol = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "80063cb4391c5249df9cd3b570b1eabed64c3843", features = ["axum"] }
 tokimo-bus-auth     = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "80063cb4391c5249df9cd3b570b1eabed64c3843", features = ["axum", "cli-db"] }
 tokimo-bus-cli      = { git = "https://github.com/tokimo-lab/tokimo-bus.git", rev = "80063cb4391c5249df9cd3b570b1eabed64c3843" }
-tokimo-package-mail = { git = "https://github.com/tokimo-lab/tokimo-package-mail.git", rev = "b06841214a42f55817fef30672b83449f21becc7" }
+tokimo-package-mail = { git = "https://github.com/tokimo-lab/tokimo-package-mail.git", rev = "1a5e0da160bafe025b1a95b2860ceee48f1763d9" }
 
 clap              = { version = "4", features = ["derive", "env"] }
 tokio             = { version = "1", features = ["rt-multi-thread", "macros", "time", "signal", "sync"] }
