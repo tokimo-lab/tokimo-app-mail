@@ -77,6 +77,9 @@ pub enum MessagesCmd {
     List {
         /// 文件夹 ID（不传则使用 INBOX）
         folder_id: Option<Uuid>,
+        /// 文件夹 ID
+        #[arg(long)]
+        folder: Option<Uuid>,
         /// 页码
         #[arg(long, default_value = "1")]
         page: u32,
@@ -222,11 +225,11 @@ pub async fn run_folders(auth: TokimoAuthArgs, account: String, cmd: FoldersCmd)
                 println!("No folders found. Run `folders sync` first.");
                 return Ok(());
             }
-            println!("{:<24}  {:<10}  {:<6}  {:<6}", "Name", "Type", "Unread", "Total");
+            println!("{:<36}  {:<24}  {:<10}  {:<6}  {:<6}", "ID", "Name", "Type", "Unread", "Total");
             for f in &folders {
                 println!(
-                    "{:<24}  {:<10}  {:<6}  {:<6}",
-                    f.name, f.folder_type, f.unread_count, f.total_count
+                    "{:<36}  {:<24}  {:<10}  {:<6}  {:<6}",
+                    f.id, f.name, f.folder_type, f.unread_count, f.total_count
                 );
             }
         }
@@ -252,11 +255,12 @@ pub async fn run_messages(auth: TokimoAuthArgs, account: String, cmd: MessagesCm
     match cmd {
         MessagesCmd::List {
             folder_id,
+            folder,
             page,
             page_size,
         } => {
-            // Default to INBOX if no folder_id specified.
-            let folder_id = match folder_id {
+            // --folder takes precedence, then positional folder_id, then INBOX.
+            let folder_id = match folder.or(folder_id) {
                 Some(id) => id,
                 None => {
                     let folders = repos::folders::list_by_account(&db, account_id).await?;
