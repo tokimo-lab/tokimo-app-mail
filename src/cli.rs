@@ -76,8 +76,6 @@ pub enum MessagesCmd {
     /// 列出文件夹中的邮件（默认 INBOX）
     List {
         /// 文件夹 ID（不传则使用 INBOX）
-        folder_id: Option<Uuid>,
-        /// 文件夹 ID
         #[arg(long)]
         folder: Option<Uuid>,
         /// 页码
@@ -254,13 +252,12 @@ pub async fn run_messages(auth: TokimoAuthArgs, account: String, cmd: MessagesCm
 
     match cmd {
         MessagesCmd::List {
-            folder_id,
             folder,
             page,
             page_size,
         } => {
-            // --folder takes precedence, then positional folder_id, then INBOX.
-            let folder_id = match folder.or(folder_id) {
+            // Default to INBOX if no --folder specified.
+            let folder_id = match folder {
                 Some(id) => id,
                 None => {
                     let folders = repos::folders::list_by_account(&db, account_id).await?;
