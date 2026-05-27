@@ -223,7 +223,10 @@ pub async fn run_folders(auth: TokimoAuthArgs, account: String, cmd: FoldersCmd)
                 println!("No folders found. Run `folders sync` first.");
                 return Ok(());
             }
-            println!("{:<36}  {:<24}  {:<10}  {:<6}  {:<6}", "ID", "Name", "Type", "Unread", "Total");
+            println!(
+                "{:<36}  {:<24}  {:<10}  {:<6}  {:<6}",
+                "ID", "Name", "Type", "Unread", "Total"
+            );
             for f in &folders {
                 println!(
                     "{:<36}  {:<24}  {:<10}  {:<6}  {:<6}",

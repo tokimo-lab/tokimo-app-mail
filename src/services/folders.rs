@@ -114,11 +114,17 @@ fn detect_folder_type(raw_name: &str, attributes: &[String]) -> String {
     if attr_str.contains("\\junk") || lower.contains("junk") || lower.contains("spam") || base.contains("垃圾") {
         return "junk".into();
     }
-    if attr_str.contains("\\all") || attr_str.contains("\\archive") || lower.contains("archive") || base.contains("所有邮件")
+    if attr_str.contains("\\all")
+        || attr_str.contains("\\archive")
+        || lower.contains("archive")
+        || base.contains("所有邮件")
     {
         return "archive".into();
     }
-    if attr_str.contains("\\flagged") || lower.contains("starred") || lower.contains("flagged") || base.contains("已加星标")
+    if attr_str.contains("\\flagged")
+        || lower.contains("starred")
+        || lower.contains("flagged")
+        || base.contains("已加星标")
     {
         return "starred".into();
     }

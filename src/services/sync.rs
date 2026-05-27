@@ -15,12 +15,20 @@ use crate::repos;
 /// Event broadcaster trait — fires entity events via the OS bus.
 pub trait EventBroadcaster: Send + Sync + 'static {
     fn broadcast_new_messages(&self, user_id: Uuid, account_id: &str, folder_id: &str, count: usize);
-    fn broadcast_flags_synced(&self, user_id: Uuid, account_id: &str, folder_id: &str, read_uids: Vec<i32>, unread_uids: Vec<i32>);
+    fn broadcast_flags_synced(
+        &self,
+        user_id: Uuid,
+        account_id: &str,
+        folder_id: &str,
+        read_uids: Vec<i32>,
+        unread_uids: Vec<i32>,
+    );
     fn broadcast_folder_counts(&self, user_id: Uuid, account_id: &str, folders: Vec<(String, i64)>);
     fn clone_box(&self) -> Box<dyn EventBroadcaster>;
 }
 
 /// No-op broadcaster for CLI mode.
+#[allow(dead_code)]
 pub struct NoopBroadcaster;
 impl EventBroadcaster for NoopBroadcaster {
     fn broadcast_new_messages(&self, _: Uuid, _: &str, _: &str, _: usize) {}
@@ -104,7 +112,9 @@ impl EventBroadcaster for BusBroadcaster {
     }
 
     fn clone_box(&self) -> Box<dyn EventBroadcaster> {
-        Box::new(BusBroadcaster { client: Arc::clone(&self.client) })
+        Box::new(BusBroadcaster {
+            client: Arc::clone(&self.client),
+        })
     }
 }
 
@@ -415,7 +425,13 @@ async fn sync_folder_messages(
             if (!read_uids.is_empty() || !unread_uids.is_empty())
                 && let Some(tx) = event_tx
             {
-                tx.broadcast_flags_synced(user_id, &account_id.to_string(), &folder.id.to_string(), read_uids, unread_uids);
+                tx.broadcast_flags_synced(
+                    user_id,
+                    &account_id.to_string(),
+                    &folder.id.to_string(),
+                    read_uids,
+                    unread_uids,
+                );
             }
         }
         Err(e) => warn!("Folder '{}': flag sync failed: {e}", folder.name),
@@ -635,11 +651,17 @@ fn detect_folder_type(raw_name: &str, attributes: &[String]) -> String {
     if attr_str.contains("\\junk") || lower.contains("junk") || lower.contains("spam") || base.contains("垃圾") {
         return "junk".into();
     }
-    if attr_str.contains("\\all") || attr_str.contains("\\archive") || lower.contains("archive") || base.contains("所有邮件")
+    if attr_str.contains("\\all")
+        || attr_str.contains("\\archive")
+        || lower.contains("archive")
+        || base.contains("所有邮件")
     {
         return "archive".into();
     }
-    if attr_str.contains("\\flagged") || lower.contains("starred") || lower.contains("flagged") || base.contains("已加星标")
+    if attr_str.contains("\\flagged")
+        || lower.contains("starred")
+        || lower.contains("flagged")
+        || base.contains("已加星标")
     {
         return "starred".into();
     }

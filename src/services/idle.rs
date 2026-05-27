@@ -83,7 +83,8 @@ async fn run_account_idle(
                     match forward_sync_inbox(&db, &cfg, account_id, user_id, &folder, event_tx.as_ref()).await {
                         Ok(0) if new_data => {
                             tokio::time::sleep(Duration::from_secs(3)).await;
-                            if let Err(e) = forward_sync_inbox(&db, &cfg, account_id, user_id, &folder, event_tx.as_ref()).await
+                            if let Err(e) =
+                                forward_sync_inbox(&db, &cfg, account_id, user_id, &folder, event_tx.as_ref()).await
                             {
                                 warn!("IDLE: inbox sync retry failed for {account_id}: {e}");
                             }
