@@ -96,12 +96,11 @@ fn detect_folder_type(raw_name: &str, attributes: &[String]) -> String {
     if attr_str.contains("\\inbox") || lower == "inbox" {
         return "inbox".into();
     }
-    if attr_str.contains("\\sent") || lower.contains("sent") || base.contains("已发送") || base.contains("送信済み")
+    if attr_str.contains("\\sent") || lower.contains("sent") || base.contains("已发送") || base.contains("已发邮件")
     {
         return "sent".into();
     }
-    if attr_str.contains("\\drafts") || lower.contains("draft") || base.contains("草稿") || base.contains("下書き")
-    {
+    if attr_str.contains("\\drafts") || lower.contains("draft") || base.contains("草稿") {
         return "drafts".into();
     }
     if attr_str.contains("\\trash")
@@ -109,33 +108,17 @@ fn detect_folder_type(raw_name: &str, attributes: &[String]) -> String {
         || lower.contains("deleted")
         || base.contains("废纸篓")
         || base.contains("已删除")
-        || base.contains("ゴミ箱")
     {
         return "trash".into();
     }
-    if attr_str.contains("\\junk")
-        || lower.contains("junk")
-        || lower.contains("spam")
-        || base.contains("垃圾")
-        || base.contains("迷惑メール")
-    {
+    if attr_str.contains("\\junk") || lower.contains("junk") || lower.contains("spam") || base.contains("垃圾") {
         return "junk".into();
     }
-    if attr_str.contains("\\all")
-        || attr_str.contains("\\archive")
-        || lower.contains("archive")
-        || lower.contains("all mail")
-        || base.contains("所有邮件")
-        || base.contains("すべてのメール")
+    if attr_str.contains("\\all") || attr_str.contains("\\archive") || lower.contains("archive") || base.contains("所有邮件")
     {
         return "archive".into();
     }
-    if attr_str.contains("\\flagged")
-        || lower.contains("starred")
-        || lower.contains("flagged")
-        || base.contains("已加星标")
-        || base.contains("星标")
-        || base.contains("スター付き")
+    if attr_str.contains("\\flagged") || lower.contains("starred") || lower.contains("flagged") || base.contains("已加星标")
     {
         return "starred".into();
     }
