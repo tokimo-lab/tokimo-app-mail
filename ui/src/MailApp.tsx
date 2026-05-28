@@ -1,16 +1,15 @@
 import { useQueryClient } from "@tanstack/react-query";
 import type { AppRuntimeCtx } from "@tokimo/sdk";
 import { useShellMenuBar } from "@tokimo/sdk/react";
-import { Button, Empty, Modal, Spin } from "@tokimo/ui";
-import { Inbox, Mail, Plus, Send } from "lucide-react";
 import {
-  type ComponentType,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+  AppSetupGuide,
+  type AppSetupGuideProps,
+  Empty,
+  Modal,
+  Spin,
+} from "@tokimo/ui";
+import { Inbox, Mail, Plus, Send } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MailList } from "./components/MailList";
 import { MailSidebar } from "./components/MailSidebar";
 import { MailViewer } from "./components/MailViewer";
@@ -21,51 +20,6 @@ import { useTranslation } from "./i18n";
 import { openShellModalWindow } from "./lib/modal-window";
 import { useContainerWidth } from "./lib/use-container-width";
 import { registerBridge } from "./modal-bridge";
-
-interface MailSetupGuideFeature {
-  icon?: ComponentType<{ className?: string }>;
-  label: string;
-}
-
-function MailSetupGuide({
-  title,
-  description,
-  features,
-  actionLabel,
-  onAction,
-}: {
-  title: string;
-  description: string;
-  features: MailSetupGuideFeature[];
-  actionLabel: string;
-  onAction: () => void;
-}) {
-  return (
-    <div className="flex h-full items-center justify-center p-8">
-      <div className="max-w-md rounded-2xl border border-border-base bg-bg-base/80 p-8 text-center shadow-sm">
-        <img src="icon.png" alt="" className="mx-auto mb-5 size-16" />
-        <h1 className="text-xl font-semibold text-text-base">{title}</h1>
-        <p className="mt-2 text-sm text-text-muted">{description}</p>
-        <div className="mt-6 space-y-3 text-left">
-          {features.map(({ icon: Icon, label }) => (
-            <div key={label} className="flex items-center gap-3 text-sm">
-              {Icon ? <Icon className="size-4 text-blue-500" /> : null}
-              <span>{label}</span>
-            </div>
-          ))}
-        </div>
-        <Button
-          className="mt-7"
-          variant="primary"
-          icon={<Plus className="size-4" />}
-          onClick={onAction}
-        >
-          {actionLabel}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
   const { t } = useTranslation();
@@ -303,14 +257,24 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
   }
 
   if (accounts.length === 0) {
+    const featureIcons = [Plus, Inbox, Send];
+    const features = (
+      t("common.setupGuide.mailFeatures", {
+        returnObjects: true,
+      }) as string[]
+    ).map((label, i) => ({
+      icon: featureIcons[i] ?? Plus,
+      label,
+    })) as AppSetupGuideProps["features"];
     return (
-      <MailSetupGuide
+      <AppSetupGuide
+        imageSrc="icon.png"
+        accentColor="blue"
         title={t("common.setupGuide.getStarted", { name: "Mail" })}
-        description={t("common.setupGuide.mailTagline")}
-        features={t("common.setupGuide.mailFeatures", {
-          returnObjects: true,
-        }).map((label, i) => ({ icon: [Plus, Inbox, Send][i], label }))}
-        actionLabel={t("common.setupGuide.mailAction")}
+        description={t("common.setupGuide.mailTagline") as string}
+        features={features}
+        actionLabel={t("common.setupGuide.mailAction") as string}
+        actionIcon={Plus as AppSetupGuideProps["actionIcon"]}
         onAction={handleAddAccount}
       />
     );
