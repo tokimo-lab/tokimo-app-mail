@@ -21,7 +21,7 @@ importers:
         version: link:../../../packages/ui
       dompurify:
         specifier: ^3.4.2
-        version: 3.4.5
+        version: 3.4.7
       lucide-react:
         specifier: ^1.11.0
         version: 1.16.0(react@19.2.6)
@@ -45,7 +45,7 @@ importers:
         specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.15)
       tailwindcss:
-        specifier: ^4.2.4
+        specifier: ^4.3.0
         version: 4.3.0
       typescript:
         specifier: ^6.0.3
@@ -205,8 +205,8 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
-  dompurify@3.4.5:
-    resolution: {integrity: sha512-OrwIBKsdNSVEeubdJ1HBv/wNENRM9ytAVCv7YXt//A3vPdVMNuACRqK9mXCGCBW2ln7BT/A4X0jXHo2Gu89miA==}
+  dompurify@3.4.7:
+    resolution: {integrity: sha512-2jBxDJY4RR06tQNy4w5FlFH7kfxsQZlufd0sbv+chfHCxeJwrFw2baUDsSwvBISD4K4RDbd0PTfy3uNXsR6siA==}
 
   fdir@6.5.0:
     resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
@@ -492,7 +492,7 @@ snapshots:
 
   '@types/dompurify@3.2.0':
     dependencies:
-      dompurify: 3.4.5
+      dompurify: 3.4.7
 
   '@types/react-dom@19.2.3(@types/react@19.2.15)':
     dependencies:
@@ -509,7 +509,7 @@ snapshots:
 
   detect-libc@2.1.2: {}
 
-  dompurify@3.4.5:
+  dompurify@3.4.7:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
