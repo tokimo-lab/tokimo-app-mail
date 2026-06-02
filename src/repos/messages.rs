@@ -6,8 +6,8 @@ use uuid::Uuid;
 use crate::db::entities::{mail_attachments, mail_messages};
 use crate::error::AppError;
 
-pub async fn max_uid_in_folder(
-    db: &DatabaseConnection,
+pub async fn max_uid_in_folder<C: ConnectionTrait>(
+    db: &C,
     account_id: Uuid,
     folder_id: Uuid,
 ) -> Result<Option<i32>, AppError> {
@@ -18,13 +18,12 @@ pub async fn max_uid_in_folder(
         .column_as(mail_messages::Column::Uid.max(), "max_uid")
         .into_tuple::<Option<i32>>()
         .one(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(result.flatten())
 }
 
-pub async fn min_uid_in_folder(
-    db: &DatabaseConnection,
+pub async fn min_uid_in_folder<C: ConnectionTrait>(
+    db: &C,
     account_id: Uuid,
     folder_id: Uuid,
 ) -> Result<Option<i32>, AppError> {
@@ -35,13 +34,12 @@ pub async fn min_uid_in_folder(
         .column_as(mail_messages::Column::Uid.min(), "min_uid")
         .into_tuple::<Option<i32>>()
         .one(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(result.flatten())
 }
 
-pub async fn list_by_folder(
-    db: &DatabaseConnection,
+pub async fn list_by_folder<C: ConnectionTrait>(
+    db: &C,
     folder_id: Uuid,
     page: u32,
     page_size: u32,
@@ -49,8 +47,7 @@ pub async fn list_by_folder(
     let total = mail_messages::Entity::find()
         .filter(mail_messages::Column::FolderId.eq(folder_id))
         .count(db)
-        .await
-        .map_err(AppError::Database)? as i64;
+        .await? as i64;
 
     let offset = u64::from((page - 1) * page_size);
     let messages = mail_messages::Entity::find()
@@ -60,22 +57,18 @@ pub async fn list_by_folder(
         .offset(offset)
         .limit(u64::from(page_size))
         .all(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
 
     Ok((messages, total))
 }
 
-pub async fn find_by_id(db: &DatabaseConnection, id: i32) -> Result<Option<mail_messages::Model>, AppError> {
-    mail_messages::Entity::find_by_id(id)
-        .one(db)
-        .await
-        .map_err(AppError::Database)
+pub async fn find_by_id<C: ConnectionTrait>(db: &C, id: i32) -> Result<Option<mail_messages::Model>, AppError> {
+    Ok(mail_messages::Entity::find_by_id(id).one(db).await?)
 }
 
 #[allow(dead_code)]
-pub async fn exists_by_uid(
-    db: &DatabaseConnection,
+pub async fn exists_by_uid<C: ConnectionTrait>(
+    db: &C,
     account_id: Uuid,
     folder_id: Uuid,
     uid: i32,
@@ -85,13 +78,12 @@ pub async fn exists_by_uid(
         .filter(mail_messages::Column::FolderId.eq(folder_id))
         .filter(mail_messages::Column::Uid.eq(uid))
         .count(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(count > 0)
 }
 
-pub async fn existing_uids_in_folder(
-    db: &DatabaseConnection,
+pub async fn existing_uids_in_folder<C: ConnectionTrait>(
+    db: &C,
     account_id: Uuid,
     folder_id: Uuid,
     uids: &[i32],
@@ -105,36 +97,33 @@ pub async fn existing_uids_in_folder(
         .filter(mail_messages::Column::Uid.is_in(uids.iter().copied()))
         .into_tuple::<i32>()
         .all(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(rows.into_iter().collect())
 }
 
-pub async fn count_unread(db: &DatabaseConnection, folder_id: Uuid) -> Result<i64, AppError> {
+pub async fn count_unread<C: ConnectionTrait>(db: &C, folder_id: Uuid) -> Result<i64, AppError> {
     let count = mail_messages::Entity::find()
         .filter(mail_messages::Column::FolderId.eq(folder_id))
         .filter(mail_messages::Column::IsRead.eq(false))
         .count(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(count as i64)
 }
 
-pub async fn count_in_folder(db: &DatabaseConnection, folder_id: Uuid) -> Result<i64, AppError> {
+pub async fn count_in_folder<C: ConnectionTrait>(db: &C, folder_id: Uuid) -> Result<i64, AppError> {
     let count = mail_messages::Entity::find()
         .filter(mail_messages::Column::FolderId.eq(folder_id))
         .count(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(count as i64)
 }
 
-pub async fn list_uids_in_folder(
-    db: &DatabaseConnection,
+pub async fn list_uids_in_folder<C: ConnectionTrait>(
+    db: &C,
     account_id: Uuid,
     folder_id: Uuid,
 ) -> Result<Vec<(i32, i32, bool)>, AppError> {
-    mail_messages::Entity::find()
+    Ok(mail_messages::Entity::find()
         .filter(mail_messages::Column::AccountId.eq(account_id))
         .filter(mail_messages::Column::FolderId.eq(folder_id))
         .select_only()
@@ -143,12 +132,11 @@ pub async fn list_uids_in_folder(
         .column(mail_messages::Column::IsRead)
         .into_tuple::<(i32, i32, bool)>()
         .all(db)
-        .await
-        .map_err(AppError::Database)
+        .await?)
 }
 
-pub async fn update_read_by_uids(
-    db: &DatabaseConnection,
+pub async fn update_read_by_uids<C: ConnectionTrait>(
+    db: &C,
     account_id: Uuid,
     folder_id: Uuid,
     uids: &[i32],
@@ -163,15 +151,14 @@ pub async fn update_read_by_uids(
         .filter(mail_messages::Column::Uid.is_in(uids.iter().copied()))
         .col_expr(mail_messages::Column::IsRead, Expr::value(is_read))
         .exec(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(result.rows_affected)
 }
 
 #[allow(clippy::too_many_arguments)]
 #[allow(dead_code)]
-pub async fn create(
-    db: &DatabaseConnection,
+pub async fn create<C: ConnectionTrait>(
+    db: &C,
     account_id: Uuid,
     folder_id: Uuid,
     uid: i32,
@@ -222,13 +209,12 @@ pub async fn create(
         body_fetched: Set(true),
         created_at: Set(now),
     };
-    mail_messages::Entity::insert(model)
+    Ok(mail_messages::Entity::insert(model)
         .exec_with_returning(db)
-        .await
-        .map_err(AppError::Database)
+        .await?)
 }
 
-pub async fn update_read_status(db: &DatabaseConnection, ids: &[i32], is_read: bool) -> Result<(), AppError> {
+pub async fn update_read_status<C: ConnectionTrait>(db: &C, ids: &[i32], is_read: bool) -> Result<(), AppError> {
     if ids.is_empty() {
         return Ok(());
     }
@@ -236,34 +222,31 @@ pub async fn update_read_status(db: &DatabaseConnection, ids: &[i32], is_read: b
         .filter(mail_messages::Column::Id.is_in(ids.iter().copied()))
         .col_expr(mail_messages::Column::IsRead, Expr::value(is_read))
         .exec(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(())
 }
 
-pub async fn delete_many(db: &DatabaseConnection, ids: &[i32]) -> Result<(), AppError> {
+pub async fn delete_many<C: ConnectionTrait>(db: &C, ids: &[i32]) -> Result<(), AppError> {
     if ids.is_empty() {
         return Ok(());
     }
     mail_messages::Entity::delete_many()
         .filter(mail_messages::Column::Id.is_in(ids.iter().copied()))
         .exec(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(())
 }
 
-pub async fn delete_all_in_folder(db: &DatabaseConnection, account_id: Uuid, folder_id: Uuid) -> Result<u64, AppError> {
+pub async fn delete_all_in_folder<C: ConnectionTrait>(db: &C, account_id: Uuid, folder_id: Uuid) -> Result<u64, AppError> {
     let res = mail_messages::Entity::delete_many()
         .filter(mail_messages::Column::AccountId.eq(account_id))
         .filter(mail_messages::Column::FolderId.eq(folder_id))
         .exec(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(res.rows_affected)
 }
 
-pub async fn reset_body_fetched(db: &DatabaseConnection, id: i32) -> Result<(), AppError> {
+pub async fn reset_body_fetched<C: ConnectionTrait>(db: &C, id: i32) -> Result<(), AppError> {
     mail_messages::Entity::update_many()
         .filter(mail_messages::Column::Id.eq(id))
         .col_expr(mail_messages::Column::BodyFetched, Expr::value(false))
@@ -271,12 +254,11 @@ pub async fn reset_body_fetched(db: &DatabaseConnection, id: i32) -> Result<(), 
         .col_expr(mail_messages::Column::HtmlBody, Expr::value(Option::<String>::None))
         .col_expr(mail_messages::Column::Preview, Expr::value(String::new()))
         .exec(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(())
 }
 
-pub async fn move_to_folder(db: &DatabaseConnection, ids: &[i32], folder_id: Uuid) -> Result<(), AppError> {
+pub async fn move_to_folder<C: ConnectionTrait>(db: &C, ids: &[i32], folder_id: Uuid) -> Result<(), AppError> {
     if ids.is_empty() {
         return Ok(());
     }
@@ -284,18 +266,17 @@ pub async fn move_to_folder(db: &DatabaseConnection, ids: &[i32], folder_id: Uui
         .filter(mail_messages::Column::Id.is_in(ids.iter().copied()))
         .col_expr(mail_messages::Column::FolderId, Expr::value(folder_id))
         .exec(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(())
 }
 
-pub async fn search(
-    db: &DatabaseConnection,
+pub async fn search<C: ConnectionTrait>(
+    db: &C,
     account_id: Uuid,
     query: &str,
 ) -> Result<Vec<mail_messages::Model>, AppError> {
     let pattern = format!("%{query}%");
-    mail_messages::Entity::find()
+    Ok(mail_messages::Entity::find()
         .filter(mail_messages::Column::AccountId.eq(account_id))
         .filter(
             sea_orm::sea_query::Condition::any()
@@ -306,23 +287,21 @@ pub async fn search(
         .order_by_with_nulls(mail_messages::Column::Date, Order::Desc, NullOrdering::Last)
         .limit(100)
         .all(db)
-        .await
-        .map_err(AppError::Database)
+        .await?)
 }
 
-pub async fn list_attachments(
-    db: &DatabaseConnection,
+pub async fn list_attachments<C: ConnectionTrait>(
+    db: &C,
     message_id: i32,
 ) -> Result<Vec<mail_attachments::Model>, AppError> {
-    mail_attachments::Entity::find()
+    Ok(mail_attachments::Entity::find()
         .filter(mail_attachments::Column::MessageId.eq(message_id))
         .all(db)
-        .await
-        .map_err(AppError::Database)
+        .await?)
 }
 
-pub async fn create_attachment(
-    db: &DatabaseConnection,
+pub async fn create_attachment<C: ConnectionTrait>(
+    db: &C,
     message_id: i32,
     filename: &str,
     content_type: &str,
@@ -337,14 +316,13 @@ pub async fn create_attachment(
         size: Set(size),
         data: Set(data.map(ToString::to_string)),
     };
-    mail_attachments::Entity::insert(model)
+    Ok(mail_attachments::Entity::insert(model)
         .exec_with_returning(db)
-        .await
-        .map_err(AppError::Database)
+        .await?)
 }
 
-pub async fn create_from_summary(
-    db: &DatabaseConnection,
+pub async fn create_from_summary<C: ConnectionTrait>(
+    db: &C,
     account_id: Uuid,
     folder_id: Uuid,
     s: &tokimo_package_mail::MailMessageSummary,
@@ -384,14 +362,13 @@ pub async fn create_from_summary(
     };
     mail_messages::Entity::insert(model)
         .exec(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn update_body(
-    db: &DatabaseConnection,
+pub async fn update_body<C: ConnectionTrait>(
+    db: &C,
     id: i32,
     text_body: Option<&str>,
     html_body: Option<&str>,
@@ -420,12 +397,11 @@ pub async fn update_body(
         .col_expr(mail_messages::Column::Refs, Expr::value(refs))
         .col_expr(mail_messages::Column::BodyFetched, Expr::value(true))
         .exec(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(())
 }
 
-pub async fn list_unfetched(db: &DatabaseConnection, limit: u64) -> Result<Vec<(i32, Uuid, i32, Uuid)>, AppError> {
+pub async fn list_unfetched<C: ConnectionTrait>(db: &C, limit: u64) -> Result<Vec<(i32, Uuid, i32, Uuid)>, AppError> {
     let rows = mail_messages::Entity::find()
         .filter(mail_messages::Column::BodyFetched.eq(false))
         .filter(mail_messages::Column::TextBody.is_null())
@@ -441,7 +417,6 @@ pub async fn list_unfetched(db: &DatabaseConnection, limit: u64) -> Result<Vec<(
         ])
         .into_tuple::<(i32, Uuid, i32, Uuid)>()
         .all(db)
-        .await
-        .map_err(AppError::Database)?;
+        .await?;
     Ok(rows)
 }

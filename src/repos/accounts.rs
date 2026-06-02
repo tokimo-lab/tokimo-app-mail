@@ -4,58 +4,51 @@ use uuid::Uuid;
 use crate::db::entities::mail_accounts;
 use crate::error::AppError;
 
-pub async fn list_by_user(db: &DatabaseConnection, user_id: Uuid) -> Result<Vec<mail_accounts::Model>, AppError> {
-    mail_accounts::Entity::find()
+pub async fn list_by_user<C: ConnectionTrait>(db: &C, user_id: Uuid) -> Result<Vec<mail_accounts::Model>, AppError> {
+    Ok(mail_accounts::Entity::find()
         .filter(mail_accounts::Column::UserId.eq(user_id))
         .order_by_asc(mail_accounts::Column::CreatedAt)
         .all(db)
-        .await
-        .map_err(AppError::Database)
+        .await?)
 }
 
-pub async fn find_by_id(db: &DatabaseConnection, id: Uuid) -> Result<Option<mail_accounts::Model>, AppError> {
-    mail_accounts::Entity::find_by_id(id)
-        .one(db)
-        .await
-        .map_err(AppError::Database)
+pub async fn find_by_id<C: ConnectionTrait>(db: &C, id: Uuid) -> Result<Option<mail_accounts::Model>, AppError> {
+    Ok(mail_accounts::Entity::find_by_id(id).one(db).await?)
 }
 
-pub async fn find_by_id_and_user(
-    db: &DatabaseConnection,
+pub async fn find_by_id_and_user<C: ConnectionTrait>(
+    db: &C,
     id: Uuid,
     user_id: Uuid,
 ) -> Result<Option<mail_accounts::Model>, AppError> {
-    mail_accounts::Entity::find_by_id(id)
+    Ok(mail_accounts::Entity::find_by_id(id)
         .filter(mail_accounts::Column::UserId.eq(user_id))
         .one(db)
-        .await
-        .map_err(AppError::Database)
+        .await?)
 }
 
-pub async fn find_by_email_and_user(
-    db: &DatabaseConnection,
+pub async fn find_by_email_and_user<C: ConnectionTrait>(
+    db: &C,
     email: &str,
     user_id: Uuid,
 ) -> Result<Option<mail_accounts::Model>, AppError> {
-    mail_accounts::Entity::find()
+    Ok(mail_accounts::Entity::find()
         .filter(mail_accounts::Column::Email.eq(email))
         .filter(mail_accounts::Column::UserId.eq(user_id))
         .one(db)
-        .await
-        .map_err(AppError::Database)
+        .await?)
 }
 
-pub async fn find_enabled_for_sync(db: &DatabaseConnection) -> Result<Vec<mail_accounts::Model>, AppError> {
-    mail_accounts::Entity::find()
+pub async fn find_enabled_for_sync<C: ConnectionTrait>(db: &C) -> Result<Vec<mail_accounts::Model>, AppError> {
+    Ok(mail_accounts::Entity::find()
         .filter(mail_accounts::Column::IsEnabled.eq(true))
         .all(db)
-        .await
-        .map_err(AppError::Database)
+        .await?)
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create(
-    db: &DatabaseConnection,
+pub async fn create<C: ConnectionTrait>(
+    db: &C,
     user_id: Uuid,
     display_name: String,
     email: String,
@@ -98,8 +91,7 @@ pub async fn create(
         created_at: Set(now),
         updated_at: Set(now),
     };
-    mail_accounts::Entity::insert(model)
+    Ok(mail_accounts::Entity::insert(model)
         .exec_with_returning(db)
-        .await
-        .map_err(AppError::Database)
+        .await?)
 }
