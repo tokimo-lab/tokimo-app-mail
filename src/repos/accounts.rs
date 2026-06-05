@@ -91,7 +91,5 @@ pub async fn create<C: ConnectionTrait>(
         created_at: Set(now),
         updated_at: Set(now),
     };
-    Ok(mail_accounts::Entity::insert(model)
-        .exec_with_returning(db)
-        .await?)
+    Ok(mail_accounts::Entity::insert(model).exec_with_returning(db).await?)
 }

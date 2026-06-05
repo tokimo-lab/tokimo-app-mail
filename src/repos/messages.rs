@@ -209,9 +209,7 @@ pub async fn create<C: ConnectionTrait>(
         body_fetched: Set(true),
         created_at: Set(now),
     };
-    Ok(mail_messages::Entity::insert(model)
-        .exec_with_returning(db)
-        .await?)
+    Ok(mail_messages::Entity::insert(model).exec_with_returning(db).await?)
 }
 
 pub async fn update_read_status<C: ConnectionTrait>(db: &C, ids: &[i32], is_read: bool) -> Result<(), AppError> {
@@ -237,7 +235,11 @@ pub async fn delete_many<C: ConnectionTrait>(db: &C, ids: &[i32]) -> Result<(), 
     Ok(())
 }
 
-pub async fn delete_all_in_folder<C: ConnectionTrait>(db: &C, account_id: Uuid, folder_id: Uuid) -> Result<u64, AppError> {
+pub async fn delete_all_in_folder<C: ConnectionTrait>(
+    db: &C,
+    account_id: Uuid,
+    folder_id: Uuid,
+) -> Result<u64, AppError> {
     let res = mail_messages::Entity::delete_many()
         .filter(mail_messages::Column::AccountId.eq(account_id))
         .filter(mail_messages::Column::FolderId.eq(folder_id))
@@ -316,9 +318,7 @@ pub async fn create_attachment<C: ConnectionTrait>(
         size: Set(size),
         data: Set(data.map(ToString::to_string)),
     };
-    Ok(mail_attachments::Entity::insert(model)
-        .exec_with_returning(db)
-        .await?)
+    Ok(mail_attachments::Entity::insert(model).exec_with_returning(db).await?)
 }
 
 pub async fn create_from_summary<C: ConnectionTrait>(
@@ -360,9 +360,7 @@ pub async fn create_from_summary<C: ConnectionTrait>(
         body_fetched: Set(false),
         created_at: Set(now),
     };
-    mail_messages::Entity::insert(model)
-        .exec(db)
-        .await?;
+    mail_messages::Entity::insert(model).exec(db).await?;
     Ok(())
 }
 
