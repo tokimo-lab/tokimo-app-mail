@@ -344,10 +344,10 @@ const BORDER_COLOR_PROPS = [
  * - Forces target="_blank" rel="noopener noreferrer" on all links
  *
  * Theme adaptation:
- * - Strips inline color if dark (luminance < 0.25) → inherit --text-primary
- * - Replaces inline gray text (luminance 0.25-0.65) → --text-secondary
+ * - Strips inline color if dark (luminance < 0.25) → inherit --color-fg-primary
+ * - Replaces inline gray text (luminance 0.25-0.65) → --color-fg-secondary
  * - Strips inline background-color if light (luminance > 0.85) → transparent
- * - Strips inline border colors if near-gray (luminance 0.65-0.95) → inherit --border-base
+ * - Strips inline border colors if near-gray (luminance 0.65-0.95) → inherit --color-border-base
  * - Strips bgcolor HTML attribute if near-white
  * - Strips <font color> HTML attribute if near-black
  * - Preserves intentional brand/accent colors (saturated hues)
@@ -383,7 +383,7 @@ function sanitizeHtml(html: string): string {
 
     // --- Inline styles ---
     if (node instanceof HTMLElement && node.style) {
-      // Text color: dark → remove; gray → --text-secondary
+      // Text color: dark → remove; gray → --color-fg-secondary
       const color = node.style.color;
       if (color) {
         const rgb = parseColorRGB(color);
@@ -392,7 +392,7 @@ function sanitizeHtml(html: string): string {
           if (lum < 0.25) {
             node.style.removeProperty("color");
           } else if (lum < 0.65) {
-            node.style.setProperty("color", "var(--text-secondary)");
+            node.style.setProperty("color", "var(--color-fg-secondary)");
           }
         }
       }
@@ -413,7 +413,7 @@ function sanitizeHtml(html: string): string {
         }
       }
 
-      // Border colors: gray → remove (inherit from --border-base via Shadow CSS)
+      // Border colors: gray → remove (inherit from --color-border-base via Shadow CSS)
       for (const prop of BORDER_COLOR_PROPS) {
         const val = node.style.getPropertyValue(prop);
         if (val) {
@@ -514,25 +514,25 @@ function neutralizeStyleBlock(css: string): string {
         /\bcolor\s*:\s*(#(?:0{3,6}|1a1a1a|222(?:222)?|333(?:333)?)|black|rgb\(\s*0\s*,\s*0\s*,\s*0\s*\))\s*(;|(?=\}))/gi,
         "color: inherit;",
       )
-      // Gray text → --text-secondary
+      // Gray text → --color-fg-secondary
       .replace(
         /\bcolor\s*:\s*#(?:666(?:666)?|777(?:777)?|888(?:888)?|999(?:999)?)\s*(;|(?=\}))/gi,
-        "color: var(--text-secondary);",
+        "color: var(--color-fg-secondary);",
       )
       // Light backgrounds → transparent
       .replace(
         /\bbackground(-color)?\s*:\s*(#(?:f{3,6}|fafafa|f5f5f5|f0f0f0|e8e8e8|eee(?:eee)?)|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))\s*(;|(?=\}))/gi,
         "background-color: transparent;",
       )
-      // Gray border colors → --border-base
+      // Gray border colors → --color-border-base
       .replace(
         /\bborder(-top|-right|-bottom|-left)?-color\s*:\s*#(?:[cd]\1{2,5}|e[0-9a-e]{2}(?:[0-9a-e]{3})?|ddd(?:ddd)?|ccc(?:ccc)?)\s*(;|(?=\}))/gi,
-        (_m, side) => `border${side || ""}-color: var(--border-base);`,
+        (_m, side) => `border${side || ""}-color: var(--color-border-base);`,
       )
-      // border shorthand with gray color: "1px solid #eee" → "1px solid var(--border-base)"
+      // border shorthand with gray color: "1px solid #eee" → "1px solid var(--color-border-base)"
       .replace(
         /\bborder(-top|-right|-bottom|-left)?\s*:\s*(\d+px\s+\w+\s+)#(?:[cd][cd][cd](?:[cd]{3})?|e[0-9a-e]{2}(?:[0-9a-e]{3})?|ddd(?:ddd)?)/gi,
-        (_, side, prefix) => `border${side || ""}: ${prefix}var(--border-base)`,
+        (_, side, prefix) => `border${side || ""}: ${prefix}var(--color-border-base)`,
       )
   );
 }
@@ -546,15 +546,15 @@ function buildShadowContent(sanitizedHtml: string): string {
 
   return `<style>
   :host { display: block; }
-  .mail-body { margin: 0; padding: 8px 16px; background: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: var(--text-primary); word-wrap: break-word; overflow-wrap: break-word; }
+  .mail-body { margin: 0; padding: 8px 16px; background: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: var(--color-fg-primary); word-wrap: break-word; overflow-wrap: break-word; }
   .mail-body img { max-width: 100%; height: auto; }
-  .mail-body a { color: var(--accent); }
+  .mail-body a { color: var(--color-accent); }
   .mail-body table { max-width: 100% !important; border-collapse: collapse; }
-  .mail-body td, .mail-body th { border-color: var(--border-base); }
+  .mail-body td, .mail-body th { border-color: var(--color-border-base); }
   .mail-body pre { white-space: pre-wrap; word-wrap: break-word; max-width: 100%; overflow-x: auto; }
-  .mail-body blockquote { margin: 8px 0; padding-left: 12px; border-left: 3px solid var(--border-base); color: var(--text-muted); }
+  .mail-body blockquote { margin: 8px 0; padding-left: 12px; border-left: 3px solid var(--color-border-base); color: var(--color-fg-muted); }
   .mail-body * { box-sizing: border-box; }
-  .mail-body hr { border-color: var(--border-base); }
+  .mail-body hr { border-color: var(--color-border-base); }
   .mail-body font { color: inherit; }
 </style>
 <div class="mail-body">${processed}</div>`;
