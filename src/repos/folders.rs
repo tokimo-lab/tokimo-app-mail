@@ -86,7 +86,7 @@ pub async fn upsert<C: ConnectionTrait>(
         if let Some(d) = delimiter {
             stmt = stmt.col_expr(mail_folders::Column::Delimiter, Expr::value(Some(d.to_string())));
         }
-        let mut results = stmt.exec_with_returning(db).await?;
+        let results = stmt.exec_with_returning(db).await?;
         return results
             .into_iter()
             .next()
