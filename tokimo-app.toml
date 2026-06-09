@@ -23,6 +23,9 @@ height       = 800
 name = "tokimo-app-mail"
 description = "Read and manage user emails with full operational support (read, send, etc.)."
 
+[skills]
+dir = "skills"
+
 [database]
 schema = "mail"
 migrations_dir = "migrations"
