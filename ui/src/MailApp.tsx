@@ -268,7 +268,7 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
     })) as AppSetupGuideProps["features"];
     return (
       <AppSetupGuide
-        imageSrc="icon.png"
+        imageSrc="/api/apps/mail/assets/icon.png"
         accentColor="blue"
         title={t("common.setupGuide.getStarted", { name: "Mail" })}
         description={t("common.setupGuide.mailTagline") as string}
