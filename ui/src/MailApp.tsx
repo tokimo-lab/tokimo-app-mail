@@ -299,47 +299,51 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
         shell={ctx.shell}
       />
 
-      {activeAccountId && selectedFolderId ? (
-        <MailList
-          accountId={activeAccountId}
-          folderId={selectedFolderId}
-          selectedMessageId={selectedMessageId}
-          onSelectMessage={setSelectedMessageId}
-          shell={ctx.shell}
-        />
-      ) : (
-        <div className="flex w-72 shrink-0 items-center justify-center border-r border-border-base">
-          <Empty
-            image={<Mail className="size-10 stroke-1" />}
-            description={t("mail.app.selectFolder")}
+      <div className="flex min-w-0 flex-1 overflow-hidden bg-[var(--color-surface-content)]">
+        {activeAccountId && selectedFolderId ? (
+          <MailList
+            accountId={activeAccountId}
+            folderId={selectedFolderId}
+            selectedMessageId={selectedMessageId}
+            onSelectMessage={setSelectedMessageId}
+            shell={ctx.shell}
           />
-        </div>
-      )}
+        ) : (
+          <div className="flex w-72 shrink-0 items-center justify-center border-r border-border-base">
+            <Empty
+              image={<Mail className="size-10 stroke-1" />}
+              description={t("mail.app.selectFolder")}
+            />
+          </div>
+        )}
 
-      {selectedMessageId ? (
-        <MailViewer
-          messageId={selectedMessageId}
-          onReply={(messageId) =>
-            openComposer({ mode: "reply", replyToMessageId: messageId })
-          }
-          onForward={(messageId) =>
-            openComposer({ mode: "forward", replyToMessageId: messageId })
-          }
-          onDelete={(id) => deleteMessageMutation.mutate({ message_ids: [id] })}
-          onClose={() => setSelectedMessageId(null)}
-        />
-      ) : (
-        <div className="flex min-w-0 flex-1 items-center justify-center">
-          <Empty
-            image={<Mail className="size-10 stroke-1" />}
-            description={
-              selectedFolderId
-                ? t("mail.app.selectMessage")
-                : t("mail.app.selectFolderFirst")
+        {selectedMessageId ? (
+          <MailViewer
+            messageId={selectedMessageId}
+            onReply={(messageId) =>
+              openComposer({ mode: "reply", replyToMessageId: messageId })
             }
+            onForward={(messageId) =>
+              openComposer({ mode: "forward", replyToMessageId: messageId })
+            }
+            onDelete={(id) =>
+              deleteMessageMutation.mutate({ message_ids: [id] })
+            }
+            onClose={() => setSelectedMessageId(null)}
           />
-        </div>
-      )}
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center justify-center">
+            <Empty
+              image={<Mail className="size-10 stroke-1" />}
+              description={
+                selectedFolderId
+                  ? t("mail.app.selectMessage")
+                  : t("mail.app.selectFolderFirst")
+              }
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
