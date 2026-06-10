@@ -1,5 +1,5 @@
 ---
-name: mail-read-inbox
+name: read-inbox
 description: "Check and read a user's email: sync a mail account, list messages in a folder (INBOX by default), and read a chosen message's full text. Also covers marking read/unread, moving, and deleting messages."
 when-to-use: "When the user wants to check, open, or read their email, see what's in their inbox, or mark/move/delete messages."
 argument-hint: "[account email] [folder]"
@@ -26,7 +26,7 @@ tokimo-app-mail accounts list
 
 So `--account` is either an email (`alice@gmail.com`) or an id
 (`359afd9d-...`). If no accounts are listed, set one up with the
-`mail-manage-accounts` skill first.
+`manage-accounts` skill first.
 
 ## Quick Reference
 
@@ -107,11 +107,11 @@ tokimo-app-mail --account alice@gmail.com messages mark-read 1207
   it before for clarity (`tokimo-app-mail --account <acct> messages list`).
 - The message `ID` for `read` / `mark-read` / `mark-unread` / `delete` / `move`
   is the **integer in the first column of `messages list`** — not the IMAP UID
-  shown by `mail-search`. Always run `messages list` to get an operable ID.
+  shown by `search`. Always run `messages list` to get an operable ID.
 - `mark-read`, `mark-unread`, `delete`, and `move` accept **multiple** ids
   separated by spaces, e.g. `messages mark-read 1207 1208 1209`.
 - `messages move` needs `--target-folder <folder-id>`; get the folder id from
   `folders list`.
 - If `folders list` is empty, run `sync` (or `folders sync`) first.
-- To find a specific email by keyword instead of paging, use the `mail-search`
-  skill. To send or reply, use `mail-send`.
+- To find a specific email by keyword instead of paging, use the `search`
+  skill. To send or reply, use `send`.

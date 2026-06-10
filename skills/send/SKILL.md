@@ -1,5 +1,5 @@
 ---
-name: mail-send
+name: send
 description: "Compose and send an email from one of the user's accounts: set recipients (to/cc), subject, plain-text or HTML body, optionally reply to a message and attach files."
 when-to-use: "When the user wants to send, reply to, or forward an email."
 argument-hint: "[account email] --to <addr> --subject <s> --body <text>"
@@ -23,7 +23,7 @@ tokimo-app-mail accounts list
 #   359afd9d-...-052e879ae483             alice@gmail.com         gmail       true
 ```
 
-If no account exists, set one up with the `mail-manage-accounts` skill first.
+If no account exists, set one up with the `manage-accounts` skill first.
 
 ## Quick Reference
 
@@ -65,7 +65,7 @@ If no account exists, set one up with the `mail-manage-accounts` skill first.
 
 4. **Reply (optional).** Pass the original message's `Message-ID` via
    `--in-reply-to` so the reply threads correctly. Find it by reading the
-   original message (`mail-read-inbox`) or via headers.
+   original message (`read-inbox`) or via headers.
 
 ## Worked Example
 

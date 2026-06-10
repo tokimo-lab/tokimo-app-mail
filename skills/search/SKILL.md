@@ -1,5 +1,5 @@
 ---
-name: mail-search
+name: search
 description: "Search a user's email by keyword across subject, sender, and body, optionally limited to one folder, to quickly find a specific message."
 when-to-use: "When the user wants to find or locate a specific email by keyword, sender, or subject rather than paging through the inbox."
 argument-hint: "[account email] <query>"
@@ -73,8 +73,8 @@ tokimo-app-mail --account alice@gmail.com search "March invoice"
 - Search output's first column is the IMAP **UID**, which identifies the
   message on the server. It is **not** the integer list `ID` used by
   `messages read` / `mark-read` / `delete`. To open or act on a found message,
-  locate it in `messages list` (use `mail-read-inbox`) and use that integer ID.
+  locate it in `messages list` (use `read-inbox`) and use that integer ID.
 - The keyword query is a single positional argument — quote multi-word phrases:
   `search "March invoice"`.
 - To browse rather than search, or to read a found message in full, use the
-  `mail-read-inbox` skill.
+  `read-inbox` skill.

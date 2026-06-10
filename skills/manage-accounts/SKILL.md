@@ -1,5 +1,5 @@
 ---
-name: mail-manage-accounts
+name: manage-accounts
 description: "Set up and manage the user's IMAP/SMTP mail accounts: list, inspect, add (with auto-detected or custom server settings), test the connection, and delete a mailbox."
 when-to-use: "When the user wants to add, configure, inspect, test, or remove a mail account, or troubleshoot why mail isn't connecting."
 argument-hint: "list | add --email <e> --password <p> | test --id <acct> | delete --id <acct>"
@@ -107,5 +107,5 @@ tokimo-app-mail accounts get --id alice@gmail.com
   is the usual fix.
 - `accounts add` auto-detects servers from the email domain; pass **both**
   `--imap-host` and `--smtp-host` to override for custom/self-hosted mail.
-- After adding an account, run a sync and read mail with the `mail-read-inbox`
+- After adding an account, run a sync and read mail with the `read-inbox`
   skill.
