@@ -27,14 +27,14 @@ use uuid::Uuid;
 #[derive(Parser, Debug)]
 #[command(
     name = "tokimo-app-mail",
-    about = "Mail — Tokimo 邮件 CLI",
-    long_about = "Tokimo Mail CLI — 管理邮件账户、文件夹、发送和接收邮件。\n\nCLI 直接读写数据库，不依赖主 server 进程运行。",
+    about = "Mail — Tokimo Email CLI",
+    long_about = "Tokimo Mail CLI — manage email accounts, folders, send and receive mail.\n\nCLI reads/writes the database directly; no main server process needed.",
     term_width = 100
 )]
 struct Cli {
     #[command(flatten)]
     auth: TokimoAuthArgs,
-    /// 账户 ID 或邮箱地址
+    /// Account ID or email address
     #[arg(long, global = true)]
     account: Option<String>,
     #[command(subcommand)]
@@ -43,53 +43,53 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// 管理邮件账户
+    /// Manage email accounts
     #[command(subcommand_required = false, arg_required_else_help = false)]
     Accounts {
         #[command(subcommand)]
         cmd: Option<cli::AccountsCmd>,
     },
-    /// 管理文件夹
+    /// Manage folders
     Folders {
         #[command(subcommand)]
         cmd: cli::FoldersCmd,
     },
-    /// 管理邮件
+    /// Manage emails
     Messages {
         #[command(subcommand)]
         cmd: cli::MessagesCmd,
     },
-    /// 发送邮件
+    /// Send email
     Send {
-        /// 收件人（可多个）
+        /// Recipients (multiple allowed)
         #[arg(long)]
         to: Vec<String>,
-        /// 抄送（可多个）
+        /// CC (multiple allowed)
         #[arg(long)]
         cc: Vec<String>,
-        /// 主题
+        /// Subject
         #[arg(long)]
         subject: String,
-        /// 正文（纯文本）
+        /// Body (plain text)
         #[arg(long)]
         body: String,
-        /// HTML 正文
+        /// HTML body
         #[arg(long)]
         html: Option<String>,
-        /// 回复的 Message-ID
+        /// Reply Message-ID
         #[arg(long)]
         in_reply_to: Option<String>,
-        /// 附件文件路径（可多个）
+        /// Attachment file paths (multiple allowed)
         #[arg(long)]
         attachment: Vec<PathBuf>,
     },
-    /// 同步账户邮件（文件夹 + 邮件）
+    /// Sync account emails (folders + messages)
     Sync,
-    /// 搜索邮件
+    /// Search emails
     Search {
-        /// 搜索关键词
+        /// Search keyword
         query: String,
-        /// 限定文件夹 ID
+        /// Limit to folder ID
         #[arg(long)]
         folder_id: Option<Uuid>,
     },

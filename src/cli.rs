@@ -17,47 +17,47 @@ use crate::services;
 
 #[derive(clap::Subcommand, Debug)]
 pub enum AccountsCmd {
-    /// 列出所有邮件账户
+    /// List all email accounts
     List,
-    /// 查看账户详情
+    /// View account details
     Get {
-        /// 账户 ID 或邮箱地址
+        /// Account ID or email address
         #[arg(long)]
         id: String,
     },
-    /// 测试账户连接 (IMAP + SMTP)
+    /// Test account connection (IMAP + SMTP)
     Test {
-        /// 账户 ID 或邮箱地址
+        /// Account ID or email address
         #[arg(long)]
         id: String,
     },
-    /// 删除邮件账户
+    /// Delete email account
     Delete {
-        /// 账户 ID 或邮箱地址
+        /// Account ID or email address
         #[arg(long)]
         id: String,
     },
-    /// 添加邮件账户
+    /// Add email account
     Add {
-        /// 邮箱地址
+        /// Email address
         #[arg(long)]
         email: String,
-        /// 密码（或应用密码）
+        /// Password (or app password)
         #[arg(long)]
         password: String,
-        /// 显示名称
+        /// Display name
         #[arg(long, default_value = "")]
         name: String,
-        /// IMAP 主机（不传则自动检测）
+        /// IMAP host (auto-detect if not provided)
         #[arg(long)]
         imap_host: Option<String>,
-        /// IMAP 端口
+        /// IMAP port
         #[arg(long, default_value = "993")]
         imap_port: u16,
-        /// SMTP 主机（不传则自动检测）
+        /// SMTP host (auto-detect if not provided)
         #[arg(long)]
         smtp_host: Option<String>,
-        /// SMTP 端口
+        /// SMTP port
         #[arg(long, default_value = "465")]
         smtp_port: u16,
     },
@@ -65,51 +65,51 @@ pub enum AccountsCmd {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum FoldersCmd {
-    /// 列出账户的所有文件夹
+    /// List all folders of an account
     List,
-    /// 从 IMAP 同步文件夹列表
+    /// Sync folder list from IMAP
     Sync,
 }
 
 #[derive(clap::Subcommand, Debug)]
 pub enum MessagesCmd {
-    /// 列出文件夹中的邮件（默认 INBOX）
+    /// List emails in folder (default INBOX)
     List {
-        /// 文件夹 ID（不传则使用 INBOX）
+        /// Folder ID (uses INBOX if not provided)
         #[arg(long)]
         folder: Option<Uuid>,
-        /// 页码
+        /// Page number
         #[arg(long, default_value = "1")]
         page: u32,
-        /// 每页数量
+        /// Items per page
         #[arg(long, default_value = "50")]
         page_size: u32,
     },
-    /// 读取邮件全文
+    /// Read full email
     Read {
-        /// 邮件 ID（`messages list` 输出的第一列）
+        /// Message ID (first column of `messages list` output)
         message_id: String,
     },
-    /// 标记为已读
+    /// Mark as read
     MarkRead {
-        /// 邮件 ID（可多个）
+        /// Message ID (multiple allowed)
         message_ids: Vec<String>,
     },
-    /// 标记为未读
+    /// Mark as unread
     MarkUnread {
-        /// 邮件 ID（可多个）
+        /// Message ID (multiple allowed)
         message_ids: Vec<String>,
     },
-    /// 删除邮件
+    /// Delete email
     Delete {
-        /// 邮件 ID（可多个）
+        /// Message ID (multiple allowed)
         message_ids: Vec<String>,
     },
-    /// 移动邮件到其他文件夹
+    /// Move email to another folder
     Move {
-        /// 邮件 ID（可多个）
+        /// Message ID (multiple allowed)
         message_ids: Vec<String>,
-        /// 目标文件夹 ID
+        /// Target folder ID
         #[arg(long)]
         target_folder: Uuid,
     },
