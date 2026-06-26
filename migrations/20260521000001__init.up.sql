@@ -2,7 +2,7 @@
 -- Host migrator runs each statement under SET LOCAL search_path = "<schema>",public
 -- so all table/index identifiers stay unqualified.
 
-CREATE TABLE IF NOT EXISTS mail_accounts (
+CREATE TABLE mail_accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
     display_name TEXT NOT NULL,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS mail_accounts (
     UNIQUE(user_id, email)
 );
 
-CREATE TABLE IF NOT EXISTS mail_folders (
+CREATE TABLE mail_folders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_id UUID NOT NULL REFERENCES mail_accounts(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS mail_folders (
     UNIQUE(account_id, name)
 );
 
-CREATE TABLE IF NOT EXISTS mail_messages (
+CREATE TABLE mail_messages (
     id SERIAL PRIMARY KEY,
     account_id UUID NOT NULL REFERENCES mail_accounts(id) ON DELETE CASCADE,
     folder_id UUID NOT NULL REFERENCES mail_folders(id) ON DELETE CASCADE,
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS mail_messages (
     UNIQUE(account_id, folder_id, uid)
 );
 
-CREATE TABLE IF NOT EXISTS mail_attachments (
+CREATE TABLE mail_attachments (
     id SERIAL PRIMARY KEY,
     message_id INT NOT NULL REFERENCES mail_messages(id) ON DELETE CASCADE,
     filename TEXT NOT NULL,
@@ -81,10 +81,10 @@ CREATE TABLE IF NOT EXISTS mail_attachments (
     data TEXT
 );
 
-CREATE INDEX IF NOT EXISTS mail_accounts_user_id_idx ON mail_accounts (user_id);
-CREATE INDEX IF NOT EXISTS mail_folders_account_id_idx ON mail_folders (account_id);
-CREATE INDEX IF NOT EXISTS mail_messages_account_folder_idx ON mail_messages (account_id, folder_id);
-CREATE INDEX IF NOT EXISTS mail_messages_account_date_idx ON mail_messages (account_id, date);
-CREATE INDEX IF NOT EXISTS mail_messages_message_id_idx ON mail_messages (message_id);
-CREATE INDEX IF NOT EXISTS mail_messages_is_read_idx ON mail_messages (is_read);
-CREATE INDEX IF NOT EXISTS mail_attachments_message_id_idx ON mail_attachments (message_id);
+CREATE INDEX mail_accounts_user_id_idx ON mail_accounts (user_id);
+CREATE INDEX mail_folders_account_id_idx ON mail_folders (account_id);
+CREATE INDEX mail_messages_account_folder_idx ON mail_messages (account_id, folder_id);
+CREATE INDEX mail_messages_account_date_idx ON mail_messages (account_id, date);
+CREATE INDEX mail_messages_message_id_idx ON mail_messages (message_id);
+CREATE INDEX mail_messages_is_read_idx ON mail_messages (is_read);
+CREATE INDEX mail_attachments_message_id_idx ON mail_attachments (message_id);
