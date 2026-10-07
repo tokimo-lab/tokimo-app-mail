@@ -19,6 +19,11 @@ export default defineApp({
     category: "system",
   },
   translations: appTranslations,
+  standalone: {
+    createWindow: (route) => ({ type: "mail", route }),
+    getRoute: (window) =>
+      window.type === "mail" ? (window.route ?? "/") : null,
+  },
   mount(container: HTMLElement, ctx: AppRuntimeCtx): Dispose {
     const root: Root = createRoot(container);
     root.render(
