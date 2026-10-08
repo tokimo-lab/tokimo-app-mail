@@ -299,7 +299,7 @@ export function MailApp({ ctx }: { ctx: AppRuntimeCtx }) {
         shell={ctx.shell}
       />
 
-      <div className="flex min-w-0 flex-1 overflow-hidden bg-[var(--color-surface-content)]">
+      <div className="app-safe-area flex min-w-0 flex-1 overflow-hidden bg-[var(--color-surface-content)]">
         {activeAccountId && selectedFolderId ? (
           <MailList
             accountId={activeAccountId}
